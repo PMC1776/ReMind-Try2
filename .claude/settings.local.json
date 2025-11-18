@@ -14,7 +14,20 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git pull:*)",
+      "Bash(git config:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(sudo dd:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sudo tee:*)",
+      "Bash(sudo apt update:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(nix-env:*)",
+      "Bash(gh:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": []

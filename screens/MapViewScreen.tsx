@@ -1,39 +1,20 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Image, Alert, Platform } from "react-native";
+import { View, StyleSheet, Image, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "../components/ThemedText";
-import { FAB } from "../components/FAB";
 import { useTheme } from "../hooks/useTheme";
 import { useReminders } from "../hooks/useReminders";
 import { Spacing, BorderRadius } from "../constants/theme";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 
 export default function MapViewScreen() {
   const { colors } = useTheme();
   const { reminders } = useReminders();
-  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
-  const [selectedReminder, setSelectedReminder] = useState<string | null>(null);
 
   const activeReminders = reminders.filter((r) => r.status === "active");
   const arrivingCount = activeReminders.filter((r) => r.trigger === "arriving").length;
   const leavingCount = activeReminders.filter((r) => r.trigger === "leaving").length;
-
-  const handleAddReminder = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      "Add Reminder",
-      "In the full version, you can tap anywhere on the map to create a location-based reminder!",
-      [
-        {
-          text: "Got it",
-          style: "default",
-        },
-      ]
-    );
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundDefault }]}>
@@ -83,8 +64,6 @@ export default function MapViewScreen() {
           </View>
         </View>
       </View>
-
-      <FAB onPress={handleAddReminder} bottom={tabBarHeight + Spacing.xl} />
     </View>
   );
 }

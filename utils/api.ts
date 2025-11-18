@@ -6,7 +6,7 @@ const API_BASE_URL = "https://remind-backend-nl3g.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // 60 seconds to account for Render cold starts
   headers: {
     "Content-Type": "application/json",
   },

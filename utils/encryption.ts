@@ -1,6 +1,24 @@
 import nacl from "tweetnacl";
 import { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } from "tweetnacl-util";
 import { secureStorage } from "./secureStorage";
+import * as Crypto from "expo-crypto";
+
+// Polyfill for crypto.getRandomValues (required for tweetnacl in React Native)
+if (typeof crypto === "undefined") {
+  (global as any).crypto = {
+    getRandomValues: (buffer: Uint8Array) => {
+      const randomBytes = Crypto.getRandomBytes(buffer.length);
+      buffer.set(randomBytes);
+      return buffer;
+    },
+  };
+} else if (!crypto.getRandomValues) {
+  crypto.getRandomValues = (buffer: Uint8Array) => {
+    const randomBytes = Crypto.getRandomBytes(buffer.length);
+    buffer.set(randomBytes);
+    return buffer;
+  };
+}
 
 export interface EncryptionKeys {
   publicKey: string;
@@ -8,7 +26,9 @@ export interface EncryptionKeys {
 }
 
 export async function generateKeypair(): Promise<EncryptionKeys> {
-  const keypair = nacl.box.keyPair();
+  // Generate random bytes for the seed using expo-crypto
+  const seed = Crypto.getRandomBytes(32);
+  const keypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(seed));
   return {
     publicKey: encodeBase64(keypair.publicKey),
     privateKey: encodeBase64(keypair.secretKey),
@@ -25,11 +45,12 @@ export async function loadKeys(): Promise<EncryptionKeys | null> {
 }
 
 export function encrypt(text: string, publicKey: string): string {
-  const nonce = nacl.randomBytes(nacl.box.nonceLength);
+  const nonce = new Uint8Array(Crypto.getRandomBytes(nacl.box.nonceLength));
   const messageUint8 = encodeUTF8(text) as Uint8Array;
   const publicKeyUint8 = decodeBase64(publicKey) as Uint8Array;
-  
-  const ephemeralKeypair = nacl.box.keyPair();
+
+  const ephemeralSeed = Crypto.getRandomBytes(32);
+  const ephemeralKeypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(ephemeralSeed));
   
   const encrypted = nacl.box(
     messageUint8,

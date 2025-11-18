@@ -55,6 +55,8 @@ export default function RecoveryKeyScreen({ navigation }: Props) {
     }
 
     setNeedsRecoveryKey(false);
+    // Navigate to login screen after saving recovery key
+    navigation.replace("Login");
   };
 
   if (loading) {

@@ -64,7 +64,10 @@ export default function SignupScreen({ navigation }: Props) {
       setNeedsRecoveryKey(true);
       navigation.navigate("EmailVerification");
     } catch (error: any) {
-      Alert.alert("Signup Failed", error.response?.data?.message || "An error occurred");
+      console.log("Signup error:", error);
+      console.log("Error response:", error.response);
+      console.log("Error message:", error.message);
+      Alert.alert("Signup Failed", error.response?.data?.message || error.message || "An error occurred");
     } finally {
       setLoading(false);
     }
