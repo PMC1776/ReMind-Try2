@@ -1,0 +1,444 @@
+ReMind - Location-Based Reminder Mobile App
+Build a React Native mobile app (using Expo) called ReMind - a privacy-first, location-based reminder application with end-to-end encryption.
+
+Core Concept
+Users create reminders that trigger automatically when they arrive at or leave specific locations. The app monitors their location in the background and sends push notifications when they enter/exit geofenced areas.
+
+App Structure & Navigation
+Bottom Tab Navigation (4 main screens):
+Map View (default home)
+List View
+Inbox
+Profile/Settings
+Modal/Overlay Screens:
+Add Reminder Sheet (appears when tapping map or FAB)
+Edit Reminder Sheet
+Location Presets Manager
+Authentication Flow (Login/Signup/Email Verification)
+Recovery Key Screen
+Archive View
+Screen Details
+1. MAP VIEW (Primary Screen)
+Layout:
+
+Full-screen interactive Google Maps
+Colored pins showing reminder locations (different colors for "arriving" vs "leaving" triggers)
+User's current location indicator (blue dot with accuracy circle)
+Floating Action Button (FAB) in bottom-right: "+" to add reminder
+Top app bar with title and profile icon
+Interactions:
+
+Tap anywhere on map → Opens "Add Reminder" sheet with that location pre-filled
+Tap existing pin → Shows reminder summary card with options to Edit/Archive/Delete
+Long-press pin → Quick action menu
+Pinch to zoom, drag to pan (standard map controls)
+Features:
+
+Real-time location tracking visible
+Geofence circles displayed around each reminder location (semi-transparent colored circles)
+Cluster pins when zoomed out if multiple reminders are close together
+2. LIST VIEW
+Layout:
+
+Scrollable list of all active reminders (card-based design)
+Search bar at top
+Filter chips: "All" | "Arriving" | "Leaving"
+Selection mode toggle (checkbox icon in header)
+Reminder Card Design: Each card shows:
+
+Task text (primary, bold)
+Location name with small map pin icon
+Trigger type badge ("Arriving" in blue or "Leaving" in orange)
+Recurrence info (e.g., "Once", "Each time", "Mon, Wed, Fri")
+Swipe actions:
+Swipe left → Archive (orange)
+Swipe right → Complete/Delete (red)
+Selection Mode:
+
+Tap checkbox in header to enable
+Multiple selections allowed
+Bottom action bar appears with: "Archive Selected" | "Delete Selected"
+3. INBOX (Triggered Reminders)
+Layout:
+
+List of reminders that have been triggered recently
+Each item shows:
+Task name
+Location where it triggered
+Whether it triggered on "ARRIVING" or "LEAVING"
+Time elapsed since trigger (e.g., "2 min ago", "1 hour ago")
+Interactions:
+
+Tap item → Dismisses from inbox (marks as "seen")
+Swipe to dismiss
+"Clear All" button in header
+Empty State:
+
+Icon of empty inbox
+Text: "No active reminders" / "You're all caught up!"
+4. PROFILE & SETTINGS
+Sections:
+
+Profile Header:
+
+User email/name
+"Logout" button
+"Archive" button (goes to archived reminders)
+Location Settings:
+
+Default Radius slider (50m - 1km)
+Accuracy Mode: "High" | "Balanced" | "Battery Saver"
+Dwell Time slider (0-300 seconds)
+Notification Settings:
+
+Toggle: Enable notifications
+Test notification button
+Security:
+
+"Change Password"
+"View Recovery Key" (shows downloadable recovery key for encryption)
+"Export Data" (GDPR compliance)
+"Delete Account" (with 30-day grace period warning)
+Appearance:
+
+Theme selector: "Light" | "Dark" | "Auto"
+About:
+
+App version
+"About Us" link
+Privacy Policy & Terms
+Add/Edit Reminder Sheet (Modal)
+Design: Bottom sheet that slides up, covering 80% of screen
+
+Fields:
+
+Task Input (required)
+
+Large text input
+Placeholder: "What do you need to remember?"
+Support for emoji picker
+Location (required)
+
+Shows selected location name/address
+"Change Location" button → Opens map picker
+Or "Use Current Location" quick action
+Trigger Type (required)
+
+Segmented control: "Arriving" | "Leaving"
+Icons for each option
+Recurrence (required)
+
+Options: "Once" | "Each Time" | "Weekly on..."
+If "Weekly": Show 7-day selector (M T W T F S S)
+Radius (optional, defaults to settings)
+
+Slider: 50m - 1km
+Shows distance in meters/feet based on locale
+Dwell Time (optional)
+
+Only visible for "ARRIVING" trigger
+Slider: 0-300 seconds
+Label: "Wait [X] seconds before alerting"
+Assignee (optional, encrypted field)
+
+Text input for assigning reminder to someone
+Placeholder: "Assign to..."
+Actions:
+
+Primary button: "Create Reminder" / "Save Changes"
+Secondary button: "Cancel"
+Authentication Flow
+Login Screen
+Logo at top
+Email input
+Password input (with show/hide toggle)
+"Login" button (full width, primary)
+"Don't have an account? Sign up" link
+Clean, minimal design
+Signup Screen
+Logo at top
+Email input (with validation)
+Password input with strength indicator (weak/medium/strong)
+Confirm password
+"Create Account" button
+Note about encryption: "Your data is encrypted end-to-end"
+"Already have an account? Login" link
+Email Verification
+Sent confirmation message
+6-digit code input (one digit per box)
+"Verify" button
+"Resend Code" link
+Auto-advance between input boxes
+Recovery Key Screen
+Shows on first login or when encryption keys are missing
+Critical message: "Save this recovery key - you'll need it if you lose your device"
+Display recovery key in monospace font
+"Download Recovery Key" button
+"I've saved my key" checkbox (required to proceed)
+Continue button (disabled until checkbox checked)
+Styling & Design System
+Color Palette:
+
+Primary Blue: #3B82F6 (for "arriving" triggers)
+Orange: #F97316 (for "leaving" triggers)
+Background Light: #FFFFFF
+Background Dark: #1F2937
+Text Light: #111827
+Text Dark: #F9FAFB
+Border: #E5E7EB / #374151
+Success: #10B981
+Danger: #EF4444
+Typography:
+
+System fonts (SF Pro on iOS, Roboto on Android)
+Headings: Bold, 24-28pt
+Body: Regular, 16pt
+Labels: Medium, 14pt
+Spacing:
+
+Consistent 8pt grid system
+Card padding: 16pt
+Screen margins: 20pt
+Components:
+
+Rounded corners (8-12pt radius)
+Subtle shadows for elevation
+Smooth animations (250ms ease)
+Haptic feedback on important actions
+Icons:
+
+Use Lucide React Native icons
+24pt standard size
+Match theme color
+Key Features & Behaviors
+Location Tracking
+Request location permissions on first launch
+Background location tracking when app is minimized
+Show location accuracy indicator
+Battery-efficient monitoring
+Geofencing
+Monitor all active reminders simultaneously
+Check if user enters/exits radius around each location
+Handle dwell time logic for "arriving" triggers
+Respect recurrence rules (don't trigger on wrong days for weekly)
+Push Notifications
+Request notification permission after login
+Rich notifications with:
+Reminder task as title
+Location name as subtitle
+Map thumbnail showing location
+Tap notification → Opens app to Inbox
+Action buttons: "Dismiss" | "View on Map"
+Encryption
+Client-side encryption using TweetNaCl
+Generate keypair on signup
+Encrypted fields: task, locationName, assignee
+Recovery key = base64(privateKey)
+Public key stored on server for future features
+Local storage of private key in secure keychain
+Offline Support
+Cache reminders locally
+Queue changes when offline
+Sync when connection restored
+Show offline indicator in UI
+Data Management
+Active reminders (status: "active")
+Archived reminders (status: "archived", archivedAt timestamp)
+Soft-delete (30-day grace before permanent deletion)
+Export all data as JSON (GDPR compliance)
+API Integration
+Base URL
+https://[YOUR_BACKEND]/api
+
+Authentication
+JWT-based authentication
+Token stored in secure storage
+Included in all requests as: Authorization: Bearer [token]
+Key Endpoints
+Authentication:
+
+POST /auth/signup
+Body: { email, password, publicKey }
+Returns: { user, token }
+
+POST /auth/login  
+Body: { email, password }
+Returns: { user, token }
+
+POST /auth/logout
+Headers: Authorization token
+
+POST /auth/verify-email
+Body: { code }
+
+POST /auth/resend-verification
+
+POST /auth/change-password
+Body: { currentPassword, newPassword }
+
+DELETE /auth/delete-account
+Soft-deletes account with 30-day grace period
+Reminders:
+
+GET /reminders?status=active
+Returns: Array of reminder objects
+
+GET /reminders?status=archived
+Returns: Archived reminders
+
+POST /reminders
+Body: { task, trigger, recurrence, location, locationName, radius, dwellTime, assignee }
+Returns: Created reminder
+
+PATCH /reminders/:id
+Body: Partial reminder object
+Returns: Updated reminder
+
+DELETE /reminders/:id
+Soft-deletes reminder
+
+POST /reminders/:id/archive
+Archives reminder
+
+POST /reminders/batch-archive
+Body: { ids: string[] }
+
+POST /reminders/batch-delete
+Body: { ids: string[] }
+Settings:
+
+GET /settings
+Returns: User settings
+
+PATCH /settings
+Body: Partial settings object
+Returns: Updated settings
+Location Presets:
+
+GET /location-presets
+Returns: Array of saved locations
+
+POST /location-presets
+Body: { name, coordinates, address, icon }
+
+DELETE /location-presets/:id
+Data Export:
+
+GET /export
+Returns: JSON file with all user data
+API Keys Required
+Google Maps API Key:
+
+Enable: Maps SDK for Android/iOS
+Enable: Places API
+Enable: Geocoding API
+Add to app.json config:
+{
+  "expo": {
+    "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_KEY"
+        }
+      }
+    },
+    "ios": {
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_KEY"
+      }
+    }
+  }
+}
+Implementation:
+
+Use react-native-maps library for map component
+Use Google Places Autocomplete for location search
+Use Google Geocoding API for address lookups
+Backend Connection
+Point all API calls to your existing Express/Node.js backend. The backend already handles:
+
+PostgreSQL database with Drizzle ORM
+JWT authentication
+Session management
+Email verification (Resend API)
+Rate limiting
+End-to-end encryption support (stores public keys, receives encrypted fields)
+Dependencies to Include
+{
+  "expo": "~51.0.0",
+  "react-native": "0.74.0",
+  "react-native-maps": "^1.14.0",
+  "@react-navigation/native": "^6.1.0",
+  "@react-navigation/bottom-tabs": "^6.5.0",
+  "@react-navigation/native-stack": "^6.9.0",
+  "expo-location": "~17.0.0",
+  "expo-notifications": "~0.28.0",
+  "expo-task-manager": "~11.8.0",
+  "expo-secure-store": "~13.0.0",
+  "axios": "^1.7.0",
+  "@tanstack/react-query": "^5.0.0",
+  "zustand": "^4.5.0",
+  "react-native-gesture-handler": "~2.16.0",
+  "react-native-reanimated": "~3.10.0",
+  "tweetnacl": "^1.0.3",
+  "tweetnacl-util": "^0.15.1",
+  "lucide-react-native": "^0.400.0",
+  "date-fns": "^3.0.0"
+}
+Important Implementation Notes
+Location Permissions:
+
+Request "Always Allow" for background location
+Explain why it's needed: "To remind you when you arrive/leave locations"
+Handle permission denial gracefully
+Background Tasks:
+
+Use Expo's TaskManager for background location updates
+Register geofence monitoring task
+Keep battery usage efficient
+Encryption:
+
+Encrypt before sending to server
+Decrypt after receiving from server
+Store private key in Expo SecureStore
+Never send private key to server
+State Management:
+
+Use Zustand for: auth, encryption keys, location, settings
+Use React Query for: server state, caching, optimistic updates
+Error Handling:
+
+Show user-friendly error messages
+Handle network errors gracefully
+Log errors for debugging (use console.error)
+Performance:
+
+Virtualize long lists (FlatList)
+Memoize expensive calculations
+Lazy load screens
+Optimize map rendering (don't show all pins if zoomed out)
+Accessibility:
+
+Add accessible labels to all interactive elements
+Support screen readers
+Ensure sufficient color contrast
+Make touch targets at least 44x44pt
+Platform Differences:
+
+Use Platform API to handle iOS/Android differences
+Test notifications on both platforms
+Handle back button on Android
+Success Criteria
+The app should:
+
+✅ Allow users to create location-based reminders
+✅ Show reminders on an interactive map
+✅ Send push notifications when entering/leaving geofenced areas
+✅ Support background location monitoring
+✅ Encrypt sensitive data client-side
+✅ Work offline and sync when online
+✅ Have smooth, native-feeling animations
+✅ Follow iOS and Android design guidelines
+✅ Handle all edge cases gracefully
+✅ Be production-ready with proper error handling
+Build this app with clean, maintainable code following React Native best practices. Focus on user experience and performance.
