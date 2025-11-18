@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,15 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
+import { useReminders } from "@/hooks/useReminders";
 import { Button } from "@/components/Button";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 
 interface AddReminderSheetProps {
   isOpen: boolean;
@@ -21,7 +24,7 @@ interface AddReminderSheetProps {
   onSave?: (reminder: any) => void;
 }
 
-type RecurrenceType = "once" | "every_time" | "custom";
+type RecurrenceType = "once" | "eachTime" | "weekly";
 type LocationType = "current" | "custom";
 
 // FormRow component for consistent layout
@@ -86,11 +89,13 @@ const SegmentedButton = ({
 
 export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminderSheetProps) {
   const { colors } = useTheme();
+  const { settings } = useReminders();
   const [task, setTask] = useState("");
   const [trigger, setTrigger] = useState<"arriving" | "leaving">("arriving");
   const [recurrence, setRecurrence] = useState<RecurrenceType>("once");
-  const [assignees, setAssignees] = useState<string[]>(["Me"]);
+  const [assignee, setAssignee] = useState<string>("Me");
   const [location, setLocation] = useState<LocationType>("current");
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Mock users for the "Who?" section
   const users = [
@@ -99,24 +104,76 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
     { id: "JS", initials: "JS" },
   ];
 
-  const toggleAssignee = (userId: string) => {
-    setAssignees((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
+  useEffect(() => {
+    if (isOpen) {
+      getCurrentLocation();
+    }
+  }, [isOpen]);
+
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission denied", "Location permission is required to create reminders.");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setCurrentLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error("Error getting location:", error);
+      Alert.alert("Error", "Could not get your current location. Please try again.");
+    }
   };
 
-  const handleSave = () => {
-    if (task.trim()) {
-      console.log("Saving reminder:", { task, trigger, recurrence, assignees, location });
-      onSave?.({ task, trigger, recurrence, assignees, location });
-      // Reset form
-      setTask("");
-      setTrigger("arriving");
-      setRecurrence("once");
-      setAssignees(["Me"]);
-      setLocation("current");
-      onClose();
+  const handleSave = async () => {
+    if (!task.trim()) {
+      return;
     }
+
+    if (!currentLocation) {
+      Alert.alert("Location required", "Please wait while we get your location.");
+      return;
+    }
+
+    // Get location name from coordinates
+    let locationName = "Current Location";
+    try {
+      const [address] = await Location.reverseGeocodeAsync(currentLocation);
+      if (address) {
+        locationName = address.name || address.street || `${address.city}, ${address.region}` || "Current Location";
+      }
+    } catch (error) {
+      console.error("Error reverse geocoding:", error);
+    }
+
+    const reminderData = {
+      task,
+      trigger,
+      recurrence,
+      assignee,
+      location: currentLocation,
+      locationName,
+      radius: settings.defaultRadius || 200,
+      dwellTime: settings.dwellTime || 0,
+    };
+
+    console.log("Saving reminder:", reminderData);
+    onSave?.(reminderData);
+
+    // Reset form
+    setTask("");
+    setTrigger("arriving");
+    setRecurrence("once");
+    setAssignee("Me");
+    setLocation("current");
+    onClose();
   };
 
   return (
@@ -143,12 +200,12 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
                       key={user.id}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        toggleAssignee(user.id);
+                        setAssignee(user.id);
                       }}
                       style={[
                         styles.assigneeButton,
                         {
-                          backgroundColor: assignees.includes(user.id)
+                          backgroundColor: assignee === user.id
                             ? colors.primary
                             : "#8B9AA3",
                         },
@@ -234,16 +291,16 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
                     Once
                   </SegmentedButton>
                   <SegmentedButton
-                    isActive={recurrence === "every_time"}
-                    onPress={() => setRecurrence("every_time")}
+                    isActive={recurrence === "eachTime"}
+                    onPress={() => setRecurrence("eachTime")}
                   >
-                    Always
+                    Each Time
                   </SegmentedButton>
                   <SegmentedButton
-                    isActive={recurrence === "custom"}
-                    onPress={() => setRecurrence("custom")}
+                    isActive={recurrence === "weekly"}
+                    onPress={() => setRecurrence("weekly")}
                   >
-                    Custom
+                    Weekly
                   </SegmentedButton>
                 </View>
               </FormRow>

@@ -45,59 +45,87 @@ export async function loadKeys(): Promise<EncryptionKeys | null> {
 }
 
 export function encrypt(text: string, publicKey: string): string {
-  const nonce = new Uint8Array(Crypto.getRandomBytes(nacl.box.nonceLength));
-  const messageUint8 = encodeUTF8(text) as Uint8Array;
-  const publicKeyUint8 = decodeBase64(publicKey) as Uint8Array;
+  try {
+    // Convert text to Uint8Array
+    const messageBytes = encodeUTF8(text);
+    const messageUint8 = new Uint8Array(messageBytes as any);
 
-  const ephemeralSeed = Crypto.getRandomBytes(32);
-  const ephemeralKeypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(ephemeralSeed));
-  
-  const encrypted = nacl.box(
-    messageUint8,
-    nonce,
-    publicKeyUint8,
-    ephemeralKeypair.secretKey
-  );
+    // Decode public key from base64 to Uint8Array
+    const publicKeyBytes = decodeBase64(publicKey);
+    const publicKeyUint8 = new Uint8Array(publicKeyBytes as any);
 
-  if (!encrypted) {
-    throw new Error("Encryption failed");
+    // Generate random nonce
+    const nonceBytes = Crypto.getRandomBytes(nacl.box.nonceLength);
+    const nonce = new Uint8Array(nonceBytes);
+
+    // Generate ephemeral keypair for this encryption
+    const ephemeralSeed = Crypto.getRandomBytes(32);
+    const ephemeralKeypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(ephemeralSeed));
+
+    // Encrypt the message
+    const encrypted = nacl.box(
+      messageUint8,
+      nonce,
+      publicKeyUint8,
+      ephemeralKeypair.secretKey
+    );
+
+    if (!encrypted) {
+      throw new Error("Encryption failed");
+    }
+
+    // Combine nonce + ephemeral public key + encrypted message
+    const fullMessage = new Uint8Array(
+      nonce.length + ephemeralKeypair.publicKey.length + encrypted.length
+    );
+    fullMessage.set(nonce, 0);
+    fullMessage.set(ephemeralKeypair.publicKey, nonce.length);
+    fullMessage.set(encrypted, nonce.length + ephemeralKeypair.publicKey.length);
+
+    return encodeBase64(fullMessage);
+  } catch (error) {
+    console.error("Encryption error details:", error);
+    throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-
-  const fullMessage = new Uint8Array(
-    nonce.length + ephemeralKeypair.publicKey.length + encrypted.length
-  );
-  fullMessage.set(nonce);
-  fullMessage.set(ephemeralKeypair.publicKey, nonce.length);
-  fullMessage.set(encrypted, nonce.length + ephemeralKeypair.publicKey.length);
-
-  return encodeBase64(fullMessage as any);
 }
 
 export function decrypt(encryptedText: string, privateKey: string): string {
-  const messageWithNonceAsUint8Array = decodeBase64(encryptedText) as Uint8Array;
-  const nonce = messageWithNonceAsUint8Array.slice(0, nacl.box.nonceLength);
-  const ephemeralPublicKey = messageWithNonceAsUint8Array.slice(
-    nacl.box.nonceLength,
-    nacl.box.nonceLength + nacl.box.publicKeyLength
-  );
-  const encryptedMessage = messageWithNonceAsUint8Array.slice(
-    nacl.box.nonceLength + nacl.box.publicKeyLength
-  );
+  try {
+    // Decode the full message from base64
+    const fullMessageBytes = decodeBase64(encryptedText);
+    const fullMessage = new Uint8Array(fullMessageBytes as any);
 
-  const privateKeyUint8 = decodeBase64(privateKey) as Uint8Array;
+    // Extract nonce, ephemeral public key, and encrypted message
+    const nonce = fullMessage.slice(0, nacl.box.nonceLength);
+    const ephemeralPublicKey = fullMessage.slice(
+      nacl.box.nonceLength,
+      nacl.box.nonceLength + nacl.box.publicKeyLength
+    );
+    const encryptedMessage = fullMessage.slice(
+      nacl.box.nonceLength + nacl.box.publicKeyLength
+    );
 
-  const decrypted = nacl.box.open(
-    encryptedMessage,
-    nonce,
-    ephemeralPublicKey,
-    privateKeyUint8
-  );
+    // Decode private key from base64
+    const privateKeyBytes = decodeBase64(privateKey);
+    const privateKeyUint8 = new Uint8Array(privateKeyBytes as any);
 
-  if (!decrypted) {
-    throw new Error("Decryption failed");
+    // Decrypt the message
+    const decrypted = nacl.box.open(
+      encryptedMessage,
+      nonce,
+      ephemeralPublicKey,
+      privateKeyUint8
+    );
+
+    if (!decrypted) {
+      throw new Error("Decryption failed - message could not be authenticated");
+    }
+
+    return decodeUTF8(decrypted);
+  } catch (error) {
+    console.error("Decryption error details:", error);
+    throw new Error(`Decryption failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-
-  return decodeUTF8(decrypted as any);
 }
 
 export function getRecoveryKey(privateKey: string): string {
@@ -105,12 +133,18 @@ export function getRecoveryKey(privateKey: string): string {
 }
 
 export function restoreFromRecoveryKey(recoveryKey: string): EncryptionKeys {
-  const privateKey = recoveryKey;
-  const privateKeyUint8 = decodeBase64(privateKey);
-  const keypair = nacl.box.keyPair.fromSecretKey(privateKeyUint8);
-  
-  return {
-    publicKey: encodeBase64(keypair.publicKey),
-    privateKey: privateKey,
-  };
+  try {
+    const privateKey = recoveryKey;
+    const privateKeyBytes = decodeBase64(privateKey);
+    const privateKeyUint8 = new Uint8Array(privateKeyBytes as any);
+    const keypair = nacl.box.keyPair.fromSecretKey(privateKeyUint8);
+
+    return {
+      publicKey: encodeBase64(keypair.publicKey),
+      privateKey: privateKey,
+    };
+  } catch (error) {
+    console.error("Recovery key restore error:", error);
+    throw new Error(`Failed to restore from recovery key: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }

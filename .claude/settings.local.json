@@ -27,7 +27,8 @@
       "Bash(sudo apt install:*)",
       "Bash(nix-env:*)",
       "Bash(gh:*)",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

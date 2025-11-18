@@ -8,6 +8,7 @@ import InboxStackNavigator from "@/navigation/InboxStackNavigator";
 import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
 import AddReminderSheet from "@/components/AddReminderSheet";
 import { useTheme } from "@/hooks/useTheme";
+import { useReminders } from "@/hooks/useReminders";
 import * as Haptics from "expo-haptics";
 
 export type MainTabParamList = {
@@ -28,6 +29,7 @@ const PMC_55BG = "#70A3A3";
 
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
+  const { addReminder } = useReminders();
   const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
 
   const handleAddPress = () => {
@@ -35,9 +37,9 @@ export default function MainTabNavigator() {
     setIsAddReminderOpen(true);
   };
 
-  const handleSaveReminder = (reminder: any) => {
+  const handleSaveReminder = async (reminder: any) => {
     console.log("Reminder saved:", reminder);
-    // TODO: Save to backend
+    await addReminder(reminder);
   };
 
   return (
