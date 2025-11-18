@@ -18,6 +18,8 @@ export default function EmailVerificationScreen({ navigation }: Props) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [verificationAttempts, setVerificationAttempts] = useState(0);
+  const [resendAttempts, setResendAttempts] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const handleCodeChange = (text: string, index: number) => {
@@ -47,10 +49,21 @@ export default function EmailVerificationScreen({ navigation }: Props) {
       return;
     }
 
+    // Rate limiting: max 5 verification attempts
+    if (verificationAttempts >= 5) {
+      Alert.alert(
+        "Too Many Attempts",
+        "You've exceeded the maximum number of verification attempts. Please request a new code."
+      );
+      setCode(["", "", "", "", "", ""]);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await authAPI.verifyEmail(verificationCode);
       setNeedsVerification(false);
+      setVerificationAttempts(0); // Reset on success
 
       if (needsRecoveryKey) {
         navigation.navigate("RecoveryKey");
@@ -58,7 +71,20 @@ export default function EmailVerificationScreen({ navigation }: Props) {
         await login(response.token, response.user);
       }
     } catch (error: any) {
-      Alert.alert("Verification Failed", error.response?.data?.message || "Invalid code");
+      setVerificationAttempts((prev) => prev + 1);
+      const remainingAttempts = 5 - (verificationAttempts + 1);
+
+      if (remainingAttempts > 0) {
+        Alert.alert(
+          "Verification Failed",
+          `Invalid code. ${remainingAttempts} attempt${remainingAttempts > 1 ? "s" : ""} remaining.`
+        );
+      } else {
+        Alert.alert(
+          "Too Many Attempts",
+          "You've used all verification attempts. Please request a new code."
+        );
+      }
       setCode(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } finally {
@@ -67,9 +93,20 @@ export default function EmailVerificationScreen({ navigation }: Props) {
   };
 
   const handleResend = async () => {
+    // Rate limiting: max 3 resend attempts
+    if (resendAttempts >= 3) {
+      Alert.alert(
+        "Too Many Requests",
+        "You've exceeded the maximum number of resend attempts. Please try again later."
+      );
+      return;
+    }
+
     setResending(true);
     try {
       await authAPI.resendVerification();
+      setResendAttempts((prev) => prev + 1);
+      setVerificationAttempts(0); // Reset verification attempts on new code
       Alert.alert("Success", "Verification code sent to your email");
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.message || "Failed to resend code");

@@ -5,16 +5,16 @@ modules = ["nodejs-22"]
 channel = "stable-24_05"
 
 [[ports]]
+localPort = 3000
+externalPort = 3001
+
+[[ports]]
 localPort = 8081
 externalPort = 80
 
 [[ports]]
 localPort = 8082
 externalPort = 3000
-
-[[ports]]
-localPort = 43199
-externalPort = 3001
 
 [workflows]
 runButton = "Project"
@@ -66,7 +66,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "cd backend && node server.js & cd .. && npm run dev"
 waitForPort = 8081
 
 [agent]

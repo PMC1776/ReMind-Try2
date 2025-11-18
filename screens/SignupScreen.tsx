@@ -9,6 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import { Spacing } from "../constants/theme";
 import { authAPI } from "../utils/api";
 import { generateKeypair, saveKeys } from "../utils/encryption";
+import { validatePasswordStrength, hashPassword } from "../utils/passwordHash";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../navigation/AuthStackNavigator";
 
@@ -23,9 +24,9 @@ export default function SignupScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
 
   const getPasswordStrength = (pass: string) => {
-    if (pass.length < 6) return "weak";
-    if (pass.length < 10) return "medium";
-    return "strong";
+    if (!pass) return "weak";
+    const validation = validatePasswordStrength(pass);
+    return validation.strength;
   };
 
   const handleSignup = async () => {
@@ -39,8 +40,13 @@ export default function SignupScreen({ navigation }: Props) {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+    // Validate password strength
+    const validation = validatePasswordStrength(password);
+    if (!validation.isValid) {
+      Alert.alert(
+        "Weak Password",
+        "Your password must meet the following requirements:\n\n" + validation.errors.join("\n")
+      );
       return;
     }
 
@@ -49,8 +55,11 @@ export default function SignupScreen({ navigation }: Props) {
       const keys = await generateKeypair();
       await saveKeys(keys);
 
-      const response = await authAPI.signup(email, password, keys.publicKey);
-      
+      // Hash password before sending to server
+      const hashedPassword = await hashPassword(password, email);
+
+      const response = await authAPI.signup(email, hashedPassword, keys.publicKey);
+
       setNeedsVerification(true);
       setNeedsRecoveryKey(true);
       navigation.navigate("EmailVerification");
@@ -76,7 +85,8 @@ export default function SignupScreen({ navigation }: Props) {
         />
         <ThemedText style={styles.title}>Create Account</ThemedText>
         <ThemedText style={[styles.subtitle, { color: colors.tabIconDefault }]}>
-          Your data is encrypted end-to-end
+          Your data is encrypted end-to-end{"\n"}
+          Password requirements: 12+ characters, uppercase, lowercase, number, special character
         </ThemedText>
 
         <Input
@@ -104,7 +114,9 @@ export default function SignupScreen({ navigation }: Props) {
               <ThemedText
                 style={{
                   color:
-                    strength === "strong"
+                    strength === "very-strong"
+                      ? colors.success
+                      : strength === "strong"
                       ? colors.success
                       : strength === "medium"
                       ? colors.orange

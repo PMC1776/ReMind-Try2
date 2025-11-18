@@ -1,7 +1,9 @@
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureStorage } from "./secureStorage";
 
-const API_BASE_URL = "https://your-backend-api.com/api";
+// TODO: Replace with your backend Replit URL after deployment
+// Example: https://remind-backend.your-username.repl.co
+const API_BASE_URL = "YOUR_BACKEND_URL_HERE";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -11,19 +13,22 @@ const api = axios.create({
   },
 });
 
+// Request interceptor - add auth token to all requests
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem("authToken");
+  const token = await secureStorage.getItem("authToken");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
+// Response interceptor - handle 401 unauthorized
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.multiRemove(["authToken", "user"]);
+      // Clear auth data on unauthorized
+      await secureStorage.multiRemove(["authToken", "user"]);
     }
     return Promise.reject(error);
   }

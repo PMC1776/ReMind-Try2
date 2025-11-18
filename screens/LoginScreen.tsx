@@ -8,6 +8,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { Spacing } from "../constants/theme";
 import { authAPI } from "../utils/api";
+import { hashPassword } from "../utils/passwordHash";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../navigation/AuthStackNavigator";
 
@@ -29,8 +30,11 @@ export default function LoginScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      const response = await authAPI.login(email, password);
-      
+      // Hash password before sending to server
+      const hashedPassword = await hashPassword(password, email);
+
+      const response = await authAPI.login(email, hashedPassword);
+
       if (response.needsVerification) {
         setNeedsVerification(true);
         navigation.navigate("EmailVerification");
@@ -38,7 +42,7 @@ export default function LoginScreen({ navigation }: Props) {
         await login(response.token, response.user);
       }
     } catch (error: any) {
-      Alert.alert("Login Failed", error.response?.data?.message || "An error occurred");
+      Alert.alert("Login Failed", "Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }

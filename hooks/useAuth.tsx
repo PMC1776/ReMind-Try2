@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { secureStorage } from "../utils/secureStorage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type AuthContextType = {
@@ -30,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadAuthState = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem("authToken");
-      const storedUser = await AsyncStorage.getItem("user");
+      const storedToken = await secureStorage.getItem("authToken");
+      const storedUser = await secureStorage.getItem("user");
 
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -47,8 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (authToken: string, userData: { email: string; id: string }) => {
     try {
-      await AsyncStorage.setItem("authToken", authToken);
-      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      await secureStorage.setItem("authToken", authToken);
+      await secureStorage.setItem("user", JSON.stringify(userData));
       setToken(authToken);
       setUser(userData);
       setIsAuthenticated(true);
@@ -60,7 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await AsyncStorage.multiRemove(["authToken", "user", "encryptionKeys", "reminders"]);
+      // Remove secure items (authToken, user, encryptionKeys)
+      await secureStorage.multiRemove(["authToken", "user", "encryptionKeys"]);
+      // Remove non-secure items (reminders, etc.)
+      await AsyncStorage.multiRemove(["reminders", "triggeredReminders", "settings"]);
       setToken(null);
       setUser(null);
       setIsAuthenticated(false);

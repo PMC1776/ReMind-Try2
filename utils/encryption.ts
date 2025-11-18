@@ -1,6 +1,6 @@
 import nacl from "tweetnacl";
 import { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } from "tweetnacl-util";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureStorage } from "./secureStorage";
 
 export interface EncryptionKeys {
   publicKey: string;
@@ -16,11 +16,11 @@ export async function generateKeypair(): Promise<EncryptionKeys> {
 }
 
 export async function saveKeys(keys: EncryptionKeys): Promise<void> {
-  await AsyncStorage.setItem("encryptionKeys", JSON.stringify(keys));
+  await secureStorage.setItem("encryptionKeys", JSON.stringify(keys));
 }
 
 export async function loadKeys(): Promise<EncryptionKeys | null> {
-  const stored = await AsyncStorage.getItem("encryptionKeys");
+  const stored = await secureStorage.getItem("encryptionKeys");
   return stored ? JSON.parse(stored) : null;
 }
 
