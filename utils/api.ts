@@ -1,9 +1,8 @@
 import axios from "axios";
 import { secureStorage } from "./secureStorage";
 
-// TODO: Replace with your backend Replit URL after deployment
-// Example: https://remind-backend.your-username.repl.co
-const API_BASE_URL = "YOUR_BACKEND_URL_HERE";
+// Backend deployed on Render
+const API_BASE_URL = "https://remind-backend-nl3g.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
