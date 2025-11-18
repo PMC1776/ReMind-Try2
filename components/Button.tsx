@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
+import { StyleSheet, Pressable, ViewStyle, StyleProp, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,7 +13,10 @@ import { BorderRadius, Spacing } from "@/constants/theme";
 
 interface ButtonProps {
   onPress?: () => void;
-  children: ReactNode;
+  children?: ReactNode;
+  title?: string;
+  variant?: "primary" | "outline" | "text";
+  icon?: ReactNode;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
 }
@@ -31,6 +34,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export function Button({
   onPress,
   children,
+  title,
+  variant = "primary",
+  icon,
   style,
   disabled = false,
 }: ButtonProps) {
@@ -53,6 +59,24 @@ export function Button({
     }
   };
 
+  const getBackgroundColor = () => {
+    if (variant === "text") return "transparent";
+    if (variant === "outline") return "transparent";
+    return theme.link;
+  };
+
+  const getTextColor = () => {
+    if (variant === "text" || variant === "outline") return theme.link;
+    return theme.buttonText;
+  };
+
+  const getBorderStyle = () => {
+    if (variant === "outline") {
+      return { borderWidth: 2, borderColor: theme.link };
+    }
+    return {};
+  };
+
   return (
     <AnimatedPressable
       onPress={disabled ? undefined : onPress}
@@ -60,21 +84,25 @@ export function Button({
       onPressOut={handlePressOut}
       disabled={disabled}
       style={[
-        styles.button,
+        variant !== "text" ? styles.button : styles.textButton,
         {
-          backgroundColor: theme.link,
+          backgroundColor: getBackgroundColor(),
           opacity: disabled ? 0.5 : 1,
         },
+        getBorderStyle(),
         style,
         animatedStyle,
       ]}
     >
-      <ThemedText
-        type="body"
-        style={[styles.buttonText, { color: theme.buttonText }]}
-      >
-        {children}
-      </ThemedText>
+      <View style={styles.content}>
+        {icon ? <View style={styles.icon}>{icon}</View> : null}
+        <ThemedText
+          type="body"
+          style={[styles.buttonText, { color: getTextColor() }]}
+        >
+          {children || title}
+        </ThemedText>
+      </View>
     </AnimatedPressable>
   );
 }
@@ -85,6 +113,20 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  textButton: {
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: {
+    marginRight: Spacing.sm,
   },
   buttonText: {
     fontWeight: "600",

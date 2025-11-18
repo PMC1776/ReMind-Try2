@@ -3,12 +3,16 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
-import HomeStackNavigator from "@/navigation/HomeStackNavigator";
+import MapStackNavigator from "@/navigation/MapStackNavigator";
+import ListStackNavigator from "@/navigation/ListStackNavigator";
+import InboxStackNavigator from "@/navigation/InboxStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 
 export type MainTabParamList = {
-  HomeTab: undefined;
+  MapTab: undefined;
+  ListTab: undefined;
+  InboxTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -19,7 +23,7 @@ export default function MainTabNavigator() {
 
   return (
     <Tab.Navigator
-      initialRouteName="HomeTab"
+      initialRouteName="MapTab"
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -44,12 +48,32 @@ export default function MainTabNavigator() {
       }}
     >
       <Tab.Screen
-        name="HomeTab"
-        component={HomeStackNavigator}
+        name="MapTab"
+        component={MapStackNavigator}
         options={{
-          title: "Home",
+          title: "Map",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
+            <Feather name="map" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ListTab"
+        component={ListStackNavigator}
+        options={{
+          title: "List",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="list" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="InboxTab"
+        component={InboxStackNavigator}
+        options={{
+          title: "Inbox",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="inbox" size={size} color={color} />
           ),
         }}
       />

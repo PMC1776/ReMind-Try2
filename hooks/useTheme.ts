@@ -8,6 +8,7 @@ export function useTheme() {
 
   return {
     theme,
+    colors: theme,
     isDark,
   };
 }

@@ -7,11 +7,17 @@ import { Spacing } from "@/constants/theme";
 export function useScreenInsets() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
+  
+  let tabBarHeight = 0;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch (error) {
+    tabBarHeight = 0;
+  }
 
   return {
     paddingTop: headerHeight + Spacing.xl,
-    paddingBottom: tabBarHeight + Spacing.xl,
+    paddingBottom: tabBarHeight ? tabBarHeight + Spacing.xl : insets.bottom + Spacing.xl,
     scrollInsetBottom: insets.bottom + 16,
   };
 }
