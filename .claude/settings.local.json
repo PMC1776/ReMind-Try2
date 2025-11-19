@@ -28,7 +28,8 @@
       "Bash(nix-env:*)",
       "Bash(gh:*)",
       "Bash(git remote set-url:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(eas credentials:*)"
     ],
     "deny": [],
     "ask": []

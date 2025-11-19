@@ -10,9 +10,13 @@ type RemindersContextType = {
   triggeredReminders: TriggeredReminder[];
   settings: UserSettings;
   addReminder: (reminder: Omit<Reminder, "id" | "createdAt" | "status">) => Promise<void>;
-  updateReminder: (id: string, updates: Partial<Reminder>) => void;
+  updateReminder: (id: string, updates: Partial<Reminder>) => Promise<void>;
   deleteReminder: (id: string) => void;
-  archiveReminder: (id: string) => void;
+  archiveReminder: (id: string) => Promise<void>;
+  restoreReminder: (id: string) => Promise<void>;
+  batchArchive: (ids: string[]) => Promise<number>;
+  batchRestore: (ids: string[]) => Promise<number>;
+  batchDelete: (ids: string[]) => Promise<number>;
   dismissTriggered: (id: string) => void;
   clearAllTriggered: () => void;
   updateSettings: (updates: Partial<UserSettings>) => void;
@@ -133,10 +137,36 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateReminder = (id: string, updates: Partial<Reminder>) => {
+  const updateReminder = async (id: string, updates: Partial<Reminder>) => {
+    const originalReminders = [...reminders];
+
+    // Update locally first
     const updated = reminders.map((r) => (r.id === id ? { ...r, ...updates } : r));
     setReminders(updated);
     saveReminders(updated);
+
+    // Sync with backend if task or other encrypted fields changed
+    try {
+      // For now, only sync if task is updated
+      if (updates.task) {
+        const keys = await loadKeys();
+        if (keys && keys.publicKey) {
+          const encryptedTask = encrypt(updates.task, keys.publicKey);
+          await remindersAPI.update(id, { title: encryptedTask });
+          console.log("Reminder updated on backend");
+        }
+      } else {
+        // For non-encrypted fields, sync directly
+        await remindersAPI.update(id, updates);
+        console.log("Reminder updated on backend");
+      }
+    } catch (error) {
+      console.error("Failed to update reminder on backend:", error);
+      // Revert local change if backend fails
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
   };
 
   const deleteReminder = (id: string) => {
@@ -145,12 +175,127 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     saveReminders(updated);
   };
 
-  const archiveReminder = (id: string) => {
+  const archiveReminder = async (id: string) => {
+    // Unix timestamp in SECONDS
+    const archivedAt = Math.floor(Date.now() / 1000);
+
+    // Save original state for rollback
+    const originalReminders = [...reminders];
+
+    // Update locally first
     const updated = reminders.map((r) =>
-      r.id === id ? { ...r, status: "archived" as const, archivedAt: new Date().toISOString() } : r
+      r.id === id ? { ...r, status: "archived" as const, archivedAt } : r
     );
     setReminders(updated);
     saveReminders(updated);
+
+    // Sync with backend
+    try {
+      await remindersAPI.archive(id);
+      console.log("Reminder archived on backend");
+    } catch (error) {
+      console.error("Failed to archive reminder on backend:", error);
+      // Revert local change if backend fails
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
+  };
+
+  const restoreReminder = async (id: string) => {
+    console.log("Restoring reminder:", id);
+
+    // Save original state for rollback
+    const originalReminders = [...reminders];
+
+    // Update locally first - set archivedAt to null for proper filtering
+    const updated = reminders.map((r) =>
+      r.id === id ? { ...r, status: "active" as const, archivedAt: undefined } : r
+    );
+
+    console.log("Updated reminders:", updated);
+    setReminders(updated);
+    saveReminders(updated);
+
+    // Sync with backend
+    try {
+      await remindersAPI.restore(id);
+      console.log("✅ Reminder restored on backend successfully");
+    } catch (error) {
+      console.error("❌ Failed to restore reminder on backend:", error);
+      // Revert local change if backend fails
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
+  };
+
+  const batchArchive = async (ids: string[]): Promise<number> => {
+    const archivedAt = Math.floor(Date.now() / 1000);
+    const originalReminders = [...reminders];
+
+    // Update locally first
+    const updated = reminders.map((r) =>
+      ids.includes(r.id) ? { ...r, status: "archived" as const, archivedAt } : r
+    );
+    setReminders(updated);
+    saveReminders(updated);
+
+    // Sync with backend
+    try {
+      const response = await remindersAPI.batchArchive(ids);
+      console.log(`${response.count} reminders archived on backend`);
+      return response.count;
+    } catch (error) {
+      console.error("Failed to batch archive reminders on backend:", error);
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
+  };
+
+  const batchRestore = async (ids: string[]): Promise<number> => {
+    const originalReminders = [...reminders];
+
+    // Update locally first
+    const updated = reminders.map((r) =>
+      ids.includes(r.id) ? { ...r, status: "active" as const, archivedAt: undefined } : r
+    );
+    setReminders(updated);
+    saveReminders(updated);
+
+    // Sync with backend
+    try {
+      const response = await remindersAPI.batchRestore(ids);
+      console.log(`${response.count} reminders restored on backend`);
+      return response.count;
+    } catch (error) {
+      console.error("Failed to batch restore reminders on backend:", error);
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
+  };
+
+  const batchDelete = async (ids: string[]): Promise<number> => {
+    const originalReminders = [...reminders];
+
+    // Update locally first
+    const updated = reminders.filter((r) => !ids.includes(r.id));
+    setReminders(updated);
+    saveReminders(updated);
+
+    // Sync with backend
+    try {
+      const response = await remindersAPI.batchDelete(ids);
+      console.log(`${response.count} reminders deleted on backend`);
+      return response.count;
+    } catch (error) {
+      console.error("Failed to batch delete reminders on backend:", error);
+      setReminders(originalReminders);
+      saveReminders(originalReminders);
+      throw error;
+    }
   };
 
   const dismissTriggered = (id: string) => {
@@ -180,6 +325,10 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         updateReminder,
         deleteReminder,
         archiveReminder,
+        restoreReminder,
+        batchArchive,
+        batchRestore,
+        batchDelete,
         dismissTriggered,
         clearAllTriggered,
         updateSettings,

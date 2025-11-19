@@ -20,7 +20,7 @@ export interface Reminder {
   assignee?: string;
   status: ReminderStatus;
   createdAt: string;
-  archivedAt?: string;
+  archivedAt?: number; // Unix timestamp in SECONDS (not milliseconds)
 }
 
 export interface TriggeredReminder {

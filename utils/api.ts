@@ -82,12 +82,21 @@ export const remindersAPI = {
     const { data } = await api.post(`/reminders/${id}/archive`);
     return data;
   },
+  restore: async (id: string) => {
+    const { data } = await api.post(`/reminders/${id}/restore`);
+    return data;
+  },
   batchArchive: async (ids: string[]) => {
     const { data } = await api.post("/reminders/batch-archive", { ids });
     return data;
   },
+  batchRestore: async (ids: string[]) => {
+    const { data } = await api.post("/reminders/batch-restore", { ids });
+    return data;
+  },
   batchDelete: async (ids: string[]) => {
-    await api.post("/reminders/batch-delete", { ids });
+    const { data } = await api.post("/reminders/batch-delete", { ids });
+    return data;
   },
 };
 

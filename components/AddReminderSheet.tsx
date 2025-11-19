@@ -14,9 +14,11 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { useReminders } from "@/hooks/useReminders";
 import { Button } from "@/components/Button";
+import CustomLocationScreen from "@/screens/CustomLocationScreen";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
+import { Coordinates } from "@/types";
 
 interface AddReminderSheetProps {
   isOpen: boolean;
@@ -94,8 +96,10 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
   const [trigger, setTrigger] = useState<"arriving" | "leaving">("arriving");
   const [recurrence, setRecurrence] = useState<RecurrenceType>("once");
   const [assignee, setAssignee] = useState<string>("Me");
-  const [location, setLocation] = useState<LocationType>("current");
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationType, setLocationType] = useState<LocationType>("current");
+  const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
+  const [customLocation, setCustomLocation] = useState<{ name: string; coordinates: Coordinates } | null>(null);
+  const [showCustomLocationModal, setShowCustomLocationModal] = useState(false);
 
   // Mock users for the "Who?" section
   const users = [
@@ -132,25 +136,41 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
     }
   };
 
+  const handleCustomLocationSelect = (location: { name: string; coordinates: Coordinates }) => {
+    setCustomLocation(location);
+    setLocationType("custom");
+    setShowCustomLocationModal(false);
+  };
+
   const handleSave = async () => {
     if (!task.trim()) {
       return;
     }
 
-    if (!currentLocation) {
-      Alert.alert("Location required", "Please wait while we get your location.");
-      return;
-    }
+    // Determine which location to use
+    let finalLocation: Coordinates;
+    let locationName: string;
 
-    // Get location name from coordinates
-    let locationName = "Current Location";
-    try {
-      const [address] = await Location.reverseGeocodeAsync(currentLocation);
-      if (address) {
-        locationName = address.name || address.street || `${address.city}, ${address.region}` || "Current Location";
+    if (locationType === "custom" && customLocation) {
+      finalLocation = customLocation.coordinates;
+      locationName = customLocation.name;
+    } else {
+      if (!currentLocation) {
+        Alert.alert("Location required", "Please wait while we get your location.");
+        return;
       }
-    } catch (error) {
-      console.error("Error reverse geocoding:", error);
+      finalLocation = currentLocation;
+
+      // Get location name from coordinates
+      locationName = "Current Location";
+      try {
+        const [address] = await Location.reverseGeocodeAsync(currentLocation);
+        if (address) {
+          locationName = address.name || address.street || `${address.city}, ${address.region}` || "Current Location";
+        }
+      } catch (error) {
+        console.error("Error reverse geocoding:", error);
+      }
     }
 
     const reminderData = {
@@ -158,7 +178,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
       trigger,
       recurrence,
       assignee,
-      location: currentLocation,
+      location: finalLocation,
       locationName,
       radius: settings.defaultRadius || 200,
       dwellTime: settings.dwellTime || 0,
@@ -172,7 +192,8 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
     setTrigger("arriving");
     setRecurrence("once");
     setAssignee("Me");
-    setLocation("current");
+    setLocationType("current");
+    setCustomLocation(null);
     onClose();
   };
 
@@ -265,19 +286,29 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
 
               {/* Where? */}
               <FormRow label="Where?">
-                <View style={styles.buttonGroup}>
-                  <SegmentedButton
-                    isActive={location === "current"}
-                    onPress={() => setLocation("current")}
-                  >
-                    Current Location
-                  </SegmentedButton>
-                  <SegmentedButton
-                    isActive={location === "custom"}
-                    onPress={() => setLocation("custom")}
-                  >
-                    Custom
-                  </SegmentedButton>
+                <View style={styles.whereContainer}>
+                  <View style={styles.buttonGroup}>
+                    <SegmentedButton
+                      isActive={locationType === "current"}
+                      onPress={() => setLocationType("current")}
+                    >
+                      Current Location
+                    </SegmentedButton>
+                    <SegmentedButton
+                      isActive={locationType === "custom"}
+                      onPress={() => setShowCustomLocationModal(true)}
+                    >
+                      Custom
+                    </SegmentedButton>
+                  </View>
+                  {locationType === "custom" && customLocation && (
+                    <View style={styles.selectedLocationContainer}>
+                      <Feather name="map-pin" size={16} color={colors.primary} />
+                      <Text style={[styles.selectedLocationText, { color: colors.text }]} numberOfLines={2}>
+                        {customLocation.name}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </FormRow>
 
@@ -318,6 +349,13 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
           </View>
         </View>
       </View>
+
+      {/* Custom Location Modal */}
+      <CustomLocationScreen
+        isOpen={showCustomLocationModal}
+        onClose={() => setShowCustomLocationModal(false)}
+        onSelect={handleCustomLocationSelect}
+      />
     </Modal>
   );
 }
@@ -433,6 +471,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  whereContainer: {
+    gap: 12,
+  },
+  selectedLocationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 8,
+  },
+  selectedLocationText: {
+    fontSize: 14,
+    flex: 1,
   },
   footer: {
     padding: Spacing.xl,
