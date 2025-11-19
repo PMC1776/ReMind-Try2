@@ -10,19 +10,16 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.remind.app",
+      "bundleIdentifier": "com.pmc.remind",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "ReMind needs your location to send reminders when you arrive at or leave specific places.",
         "NSLocationWhenInUseUsageDescription": "ReMind needs your location to show where you are on the map and create location-based reminders.",
         "NSLocationAlwaysUsageDescription": "ReMind needs background location access to remind you when you arrive at or leave specific places, even when the app is closed.",
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
       }
     },
     "android": {
-      "package": "com.remind.app",
+      "package": "com.pmc.remind",
       "adaptiveIcon": {
         "backgroundColor": "#3B82F6",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -38,12 +35,7 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
-        }
-      }
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "single",
@@ -77,8 +69,23 @@
           "color": "#3B82F6"
         }
       ],
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "AIzaSyAGohtmpCOxqO88_AMJ6LWNp4jnl1wpFaY"
+        }
+      ],
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic",
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true

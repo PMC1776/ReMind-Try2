@@ -29,7 +29,12 @@
       "Bash(gh:*)",
       "Bash(git remote set-url:*)",
       "Bash(npx tsc:*)",
-      "Bash(eas credentials:*)"
+      "Bash(eas credentials:*)",
+      "Bash(eas whoami:*)",
+      "Bash(eas build:*)",
+      "Bash(npx expo config --type public)",
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

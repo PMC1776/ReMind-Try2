@@ -7,6 +7,7 @@ import ListStackNavigator from "@/navigation/ListStackNavigator";
 import InboxStackNavigator from "@/navigation/InboxStackNavigator";
 import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
 import AddReminderSheet from "@/components/AddReminderSheet";
+import SuccessConfetti from "@/components/SuccessConfetti";
 import { useTheme } from "@/hooks/useTheme";
 import { useReminders } from "@/hooks/useReminders";
 import * as Haptics from "expo-haptics";
@@ -31,6 +32,7 @@ export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const { addReminder } = useReminders();
   const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const handleAddPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -40,6 +42,7 @@ export default function MainTabNavigator() {
   const handleSaveReminder = async (reminder: any) => {
     console.log("Reminder saved:", reminder);
     await addReminder(reminder);
+    setShowConfetti(true);
   };
 
   return (
@@ -124,6 +127,12 @@ export default function MainTabNavigator() {
       isOpen={isAddReminderOpen}
       onClose={() => setIsAddReminderOpen(false)}
       onSave={handleSaveReminder}
+    />
+
+    <SuccessConfetti
+      show={showConfetti}
+      onComplete={() => setShowConfetti(false)}
+      color="primary"
     />
     </>
   );

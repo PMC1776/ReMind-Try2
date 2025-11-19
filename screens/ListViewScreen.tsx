@@ -7,6 +7,7 @@ import { FilterChip } from "../components/FilterChip";
 import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/Button";
 import { EditReminderModal } from "../components/EditReminderModal";
+import SuccessConfetti from "../components/SuccessConfetti";
 import { ScreenScrollView } from "../components/ScreenScrollView";
 import { useTheme } from "../hooks/useTheme";
 import { useReminders } from "../hooks/useReminders";
@@ -23,6 +24,7 @@ export default function ListViewScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [reminderToEdit, setReminderToEdit] = useState<{ id: string; task: string } | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const filteredByStatus = reminders.filter((r) => r.status === viewMode);
 
@@ -116,7 +118,7 @@ export default function ListViewScreen() {
   const handleRestore = async (id: string) => {
     try {
       await restoreReminder(id);
-      Alert.alert("Success", "Reminder restored");
+      setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to restore reminder");
     }
@@ -160,7 +162,7 @@ export default function ListViewScreen() {
       const count = await batchRestore(selectedIds);
       setSelectedIds([]);
       setSelectionMode(false);
-      Alert.alert("Success", `${count} reminder${count === 1 ? '' : 's'} restored`);
+      setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to restore reminders");
     }
@@ -381,6 +383,13 @@ export default function ListViewScreen() {
           setReminderToEdit(null);
         }}
         onSave={handleSaveEdit}
+      />
+
+      {/* Success Confetti */}
+      <SuccessConfetti
+        show={showConfetti}
+        onComplete={() => setShowConfetti(false)}
+        color="orange"
       />
     </ScreenScrollView>
   );
