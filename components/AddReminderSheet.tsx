@@ -15,6 +15,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useReminders } from "@/hooks/useReminders";
 import { Button } from "@/components/Button";
 import CustomLocationScreen from "@/screens/CustomLocationScreen";
+import { CustomRecurrenceSheet } from "@/components/CustomRecurrenceSheet";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
@@ -24,9 +25,15 @@ interface AddReminderSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onSave?: (reminder: any) => void;
+  existingReminder?: any;
+  prefilledLocation?: { coordinates: Coordinates; name: string } | null;
 }
 
-type RecurrenceType = "once" | "eachTime" | "weekly";
+type RecurrenceType =
+  | { type: "once" }
+  | { type: "eachTime" }
+  | { type: "weekly"; days: boolean[]; timeStart?: string; timeEnd?: string; endDate?: string }
+  | { type: "specific_dates"; dates: string[]; timeStart?: string; timeEnd?: string; endDate?: string };
 type LocationType = "current" | "custom";
 
 // FormRow component for consistent layout
@@ -80,26 +87,27 @@ const SegmentedButton = ({
       style={[
         styles.segmentedButton,
         {
-          backgroundColor: isActive ? colors.primary : "#8B9AA3",
+          backgroundColor: isActive ? colors.primary : colors.surfaceSecondary,
         },
       ]}
     >
-      <Text style={styles.segmentedButtonText}>{children}</Text>
+      <Text style={[styles.segmentedButtonText, { color: isActive ? colors.buttonText : colors.textPrimary }]}>{children}</Text>
     </TouchableOpacity>
   );
 };
 
-export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminderSheetProps) {
+export default function AddReminderSheet({ isOpen, onClose, onSave, existingReminder, prefilledLocation }: AddReminderSheetProps) {
   const { colors } = useTheme();
   const { settings } = useReminders();
   const [task, setTask] = useState("");
   const [trigger, setTrigger] = useState<"arriving" | "leaving">("arriving");
-  const [recurrence, setRecurrence] = useState<RecurrenceType>("once");
-  const [assignee, setAssignee] = useState<string>("Me");
+  const [recurrence, setRecurrence] = useState<RecurrenceType>({ type: "once" });
+  const [assignees, setAssignees] = useState<string[]>(["Me"]);
   const [locationType, setLocationType] = useState<LocationType>("current");
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
   const [customLocation, setCustomLocation] = useState<{ name: string; coordinates: Coordinates } | null>(null);
   const [showCustomLocationModal, setShowCustomLocationModal] = useState(false);
+  const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
 
   // Mock users for the "Who?" section
   const users = [
@@ -108,11 +116,37 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
     { id: "JS", initials: "JS" },
   ];
 
+  // Pre-fill form when editing existing reminder
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && existingReminder) {
+      setTask(existingReminder.task || "");
+      setTrigger(existingReminder.trigger || "arriving");
+      setRecurrence(existingReminder.recurrence || { type: "once" });
+      setAssignees(existingReminder.assignees || ["Me"]);
+
+      // Set custom location from existing reminder
+      if (existingReminder.location && existingReminder.locationName) {
+        setCustomLocation({
+          name: existingReminder.locationName,
+          coordinates: existingReminder.location,
+        });
+        setLocationType("custom");
+      }
+    } else if (isOpen && prefilledLocation) {
+      // Pre-fill location from map tap
+      setCustomLocation(prefilledLocation);
+      setLocationType("custom");
+    } else if (isOpen) {
+      // Reset form for new reminder
+      setTask("");
+      setTrigger("arriving");
+      setRecurrence({ type: "once" });
+      setAssignees(["Me"]);
+      setLocationType("current");
+      setCustomLocation(null);
       getCurrentLocation();
     }
-  }, [isOpen]);
+  }, [isOpen, existingReminder, prefilledLocation]);
 
   const getCurrentLocation = async () => {
     try {
@@ -177,7 +211,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
       task,
       trigger,
       recurrence,
-      assignee,
+      assignees,
       location: finalLocation,
       locationName,
       radius: settings.defaultRadius || 200,
@@ -190,8 +224,8 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
     // Reset form
     setTask("");
     setTrigger("arriving");
-    setRecurrence("once");
-    setAssignee("Me");
+    setRecurrence({ type: "once" });
+    setAssignees(["Me"]);
     setLocationType("current");
     setCustomLocation(null);
     onClose();
@@ -207,7 +241,9 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
         <View style={[styles.sheet, { backgroundColor: colors.backgroundRoot }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>New Reminder</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {existingReminder ? "Edit Reminder" : "New Reminder"}
+            </Text>
           </View>
 
           {/* Form */}
@@ -221,22 +257,30 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
                       key={user.id}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setAssignee(user.id);
+                        setAssignees((prev) => {
+                          if (prev.includes(user.id)) {
+                            // Remove if already selected (but keep at least one)
+                            return prev.length > 1 ? prev.filter((id) => id !== user.id) : prev;
+                          } else {
+                            // Add to selection
+                            return [...prev, user.id];
+                          }
+                        });
                       }}
                       style={[
                         styles.assigneeButton,
                         {
-                          backgroundColor: assignee === user.id
+                          backgroundColor: assignees.includes(user.id)
                             ? colors.primary
-                            : "#8B9AA3",
+                            : colors.surfaceSecondary,
                         },
                       ]}
                     >
-                      <Text style={styles.assigneeText}>{user.initials}</Text>
+                      <Text style={[styles.assigneeText, { color: assignees.includes(user.id) ? colors.buttonText : colors.textPrimary }]}>{user.initials}</Text>
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
-                    style={[styles.addAssigneeButton, { borderColor: "#8B9AA3" }]}
+                    style={[styles.addAssigneeButton, { borderColor: colors.border }]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       console.log("Add new contact");
@@ -316,22 +360,22 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
               <FormRow label="How Often?" showBorder={false}>
                 <View style={styles.buttonGroup}>
                   <SegmentedButton
-                    isActive={recurrence === "once"}
-                    onPress={() => setRecurrence("once")}
+                    isActive={recurrence.type === "once"}
+                    onPress={() => setRecurrence({ type: "once" })}
                   >
                     Once
                   </SegmentedButton>
                   <SegmentedButton
-                    isActive={recurrence === "eachTime"}
-                    onPress={() => setRecurrence("eachTime")}
+                    isActive={recurrence.type === "eachTime"}
+                    onPress={() => setRecurrence({ type: "eachTime" })}
                   >
-                    Each Time
+                    Always
                   </SegmentedButton>
                   <SegmentedButton
-                    isActive={recurrence === "weekly"}
-                    onPress={() => setRecurrence("weekly")}
+                    isActive={recurrence.type === "weekly" || recurrence.type === "specific_dates"}
+                    onPress={() => setShowCustomRecurrenceModal(true)}
                   >
-                    Weekly
+                    Custom
                   </SegmentedButton>
                 </View>
               </FormRow>
@@ -341,7 +385,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
           {/* Submit Button */}
           <View style={[styles.footer, { borderTopColor: colors.border }]}>
             <Button
-              title="Set Reminder"
+              title={existingReminder ? "Update Reminder" : "Set Reminder"}
               onPress={handleSave}
               disabled={!task.trim()}
               style={styles.submitButton}
@@ -355,6 +399,14 @@ export default function AddReminderSheet({ isOpen, onClose, onSave }: AddReminde
         isOpen={showCustomLocationModal}
         onClose={() => setShowCustomLocationModal(false)}
         onSelect={handleCustomLocationSelect}
+      />
+
+      {/* Custom Recurrence Modal */}
+      <CustomRecurrenceSheet
+        isOpen={showCustomRecurrenceModal}
+        onClose={() => setShowCustomRecurrenceModal(false)}
+        recurrence={recurrence}
+        setRecurrence={setRecurrence}
       />
     </Modal>
   );

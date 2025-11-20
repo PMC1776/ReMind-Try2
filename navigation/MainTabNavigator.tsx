@@ -22,12 +22,6 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Custom colors from Tailwind design
-// HSL(180, 20%, 80%) -> light teal background
-const PMC_80BG = "#BFD9D9";
-// HSL(180, 20%, 55%) -> medium teal for accent
-const PMC_55BG = "#70A3A3";
-
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const { addReminder } = useReminders();
@@ -56,8 +50,9 @@ export default function MainTabNavigator() {
         tabBarStyle: {
           position: "absolute",
           height: 56,
-          backgroundColor: PMC_80BG,
-          borderTopWidth: 0,
+          backgroundColor: theme.background,
+          borderTopWidth: 1,
+          borderTopColor: theme.border,
           elevation: 0,
           paddingHorizontal: 12,
         },
@@ -96,12 +91,12 @@ export default function MainTabNavigator() {
               style={[
                 styles.addButton,
                 {
-                  backgroundColor: PMC_55BG,
-                  borderColor: PMC_55BG,
+                  backgroundColor: theme.primary,
+                  borderColor: theme.primary,
                 },
               ]}
             >
-              <Feather name="plus" size={24} color="#FFFFFF" />
+              <Feather name="plus" size={24} color={theme.buttonText} />
             </View>
           ),
         }}

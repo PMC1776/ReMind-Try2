@@ -2,12 +2,14 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ProfileScreen from "@/screens/ProfileScreen";
 import ArchiveScreen from "@/screens/ArchiveScreen";
+import AdvancedSettingsScreen from "@/screens/AdvancedSettingsScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
 
 export type SettingsStackParamList = {
   Settings: undefined;
   Archive: undefined;
+  AdvancedSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
@@ -29,6 +31,13 @@ export default function SettingsStackNavigator() {
         component={ArchiveScreen}
         options={{
           title: "Archive",
+        }}
+      />
+      <Stack.Screen
+        name="AdvancedSettings"
+        component={AdvancedSettingsScreen}
+        options={{
+          title: "Advanced Settings",
         }}
       />
     </Stack.Navigator>

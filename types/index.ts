@@ -1,5 +1,9 @@
 export type TriggerType = "arriving" | "leaving";
-export type RecurrenceType = "once" | "eachTime" | "weekly";
+export type RecurrenceType =
+  | { type: "once" }
+  | { type: "eachTime" }
+  | { type: "weekly"; days: boolean[]; timeStart?: string; timeEnd?: string; endDate?: string }
+  | { type: "specific_dates"; dates: string[]; timeStart?: string; timeEnd?: string; endDate?: string };
 export type ReminderStatus = "active" | "archived";
 
 export interface Coordinates {
@@ -12,12 +16,11 @@ export interface Reminder {
   task: string;
   trigger: TriggerType;
   recurrence: RecurrenceType;
-  weeklyDays?: number[];
   location: Coordinates;
   locationName: string;
   radius: number;
   dwellTime?: number;
-  assignee?: string;
+  assignees?: string[];
   status: ReminderStatus;
   createdAt: string;
   archivedAt?: number; // Unix timestamp in SECONDS (not milliseconds)
@@ -37,4 +40,6 @@ export interface UserSettings {
   accuracyMode: "high" | "balanced" | "battery";
   dwellTime: number;
   notificationsEnabled: boolean;
+  distanceUnit: "miles" | "km";
+  timeFormat: "12h" | "24h";
 }

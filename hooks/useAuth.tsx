@@ -53,6 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(authToken);
       setUser(userData);
       setIsAuthenticated(true);
+
+      // Check if encryption keys exist, if not, user needs to import recovery key
+      const keys = await secureStorage.getItem("encryptionKeys");
+      if (!keys) {
+        console.log("⚠️ No encryption keys found after login - user needs to import recovery key");
+        // You could set a flag here to prompt for recovery key import
+        // For now, we'll just log it
+      }
     } catch (error) {
       console.error("Failed to save auth state:", error);
       throw error;
@@ -61,8 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Remove secure items (authToken, user, encryptionKeys)
-      await secureStorage.multiRemove(["authToken", "user", "encryptionKeys"]);
+      // Remove secure items (authToken, user) - KEEP encryptionKeys so they persist per device
+      await secureStorage.multiRemove(["authToken", "user"]);
       // Remove non-secure items (reminders, etc.)
       await AsyncStorage.multiRemove(["reminders", "triggeredReminders", "settings"]);
       setToken(null);

@@ -1,40 +1,86 @@
 import { Platform } from "react-native";
 
-const primaryBlue = "#3B82F6";
-const orange = "#F97316";
+// Primary accent colors - ReMind signature coral
+const coral = "#FF6B6B";
+const coralDark = "#E85555";
+const coralLight = "#FFE5E5";
 
 export const Colors = {
   light: {
-    text: "#111827",
+    // Primary colors
+    coral: coral,
+    coralDark: coralDark,
+    coralLight: coralLight,
+    primary: coral, // Primary action color
+    link: coral,
+
+    // Text colors
+    text: "#1A1A1A", // Primary text
+    textPrimary: "#1A1A1A",
+    textSecondary: "#6B6B6B", // Labels and subtext
+    textTertiary: "#999999", // Placeholder text
     buttonText: "#FFFFFF",
-    tabIconDefault: "#687076",
-    tabIconSelected: primaryBlue,
-    link: primaryBlue,
-    primary: primaryBlue,
-    orange: orange,
-    success: "#10B981",
-    danger: "#EF4444",
-    border: "#E5E7EB",
-    backgroundRoot: "#FFFFFF",
-    backgroundDefault: "#F2F2F2",
-    backgroundSecondary: "#E6E6E6",
+
+    // Tab/Icon colors
+    tabIconDefault: "#6B6B6B",
+    tabIconSelected: coral,
+
+    // Background colors
+    background: "#FFF8F6", // Main app background (peachy-cream)
+    backgroundRoot: "#FFFFFF", // Surface/cards
+    backgroundDefault: "#FFF8F6", // Main app background
+    backgroundSecondary: "#F5F5F5", // Unselected pills/buttons
     backgroundTertiary: "#D9D9D9",
+    surface: "#FFFFFF", // Modal/card backgrounds
+    surfaceSecondary: "#F5F5F5",
+
+    // Borders & dividers
+    border: "#E8E8E8",
+    disabled: "#C4C4C4",
+
+    // Supporting colors
+    success: "#4CAF50",
+    danger: "#DC3545", // Destructive actions
+    destructive: "#DC3545",
+    infoBackground: "#F0F9FF",
   },
   dark: {
+    // Primary colors
+    coral: coral,
+    coralDark: coralDark,
+    coralLight: coralLight,
+    primary: coral,
+    link: coral,
+
+    // Text colors
     text: "#F9FAFB",
+    textPrimary: "#F9FAFB",
+    textSecondary: "#9BA1A6",
+    textTertiary: "#6B6B6B",
     buttonText: "#FFFFFF",
+
+    // Tab/Icon colors
     tabIconDefault: "#9BA1A6",
-    tabIconSelected: primaryBlue,
-    link: primaryBlue,
-    primary: primaryBlue,
-    orange: orange,
-    success: "#10B981",
-    danger: "#EF4444",
-    border: "#374151",
+    tabIconSelected: coral,
+
+    // Background colors
+    background: "#1F2937",
     backgroundRoot: "#1F2937",
     backgroundDefault: "#2A2C2E",
     backgroundSecondary: "#353739",
     backgroundTertiary: "#404244",
+    surface: "#1F2937",
+    surfaceSecondary: "#353739",
+
+    // Borders & dividers
+    border: "#374151",
+    disabled: "#6B6B6B",
+
+    // Supporting colors
+    success: "#4CAF50",
+    danger: "#DC3545",
+    destructive: "#DC3545",
+    infoBackground: "#1F2937",
   },
 };
 

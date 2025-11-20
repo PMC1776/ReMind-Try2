@@ -2,8 +2,9 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { Reminder, TriggeredReminder, UserSettings } from "../types";
 import { loadReminders, saveReminders, loadTriggeredReminders, saveTriggeredReminders, loadSettings, saveSettings } from "../utils/storage";
 import { remindersAPI } from "../utils/api";
-import { encrypt, loadKeys } from "../utils/encryption";
+import { encrypt, decrypt, loadKeys } from "../utils/encryption";
 import { secureStorage } from "../utils/secureStorage";
+import { ensureEncryptionKeys } from "../utils/ensureEncryptionKeys";
 
 type RemindersContextType = {
   reminders: Reminder[];
@@ -33,6 +34,8 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     accuracyMode: "balanced",
     dwellTime: 0,
     notificationsEnabled: true,
+    distanceUnit: "miles",
+    timeFormat: "12h",
   });
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +45,10 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
 
   const loadData = async () => {
     try {
+      // Ensure encryption keys exist before doing anything
+      await ensureEncryptionKeys();
+
+      // Load from local storage first (fast)
       const [loadedReminders, loadedTriggered, loadedSettings] = await Promise.all([
         loadReminders(),
         loadTriggeredReminders(),
@@ -50,10 +57,95 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       setReminders(loadedReminders);
       setTriggeredReminders(loadedTriggered);
       setSettings(loadedSettings);
+
+      // Then sync with backend (in background)
+      syncFromBackend();
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncFromBackend = async () => {
+    try {
+      const user = await secureStorage.getItem("user");
+      if (!user) {
+        console.log("No user found, skipping backend sync");
+        return;
+      }
+
+      console.log("Syncing reminders from backend...");
+
+      // Get encryption keys for decryption
+      const keys = await loadKeys();
+      if (!keys || !keys.privateKey) {
+        console.log("No encryption keys found, cannot decrypt reminders");
+        return;
+      }
+
+      // Fetch all reminders (active and archived)
+      const [activeData, archivedData] = await Promise.all([
+        remindersAPI.getAll("active"),
+        remindersAPI.getAll("archived"),
+      ]);
+
+      const backendReminders = [...(activeData.reminders || []), ...(archivedData.reminders || [])];
+
+      if (backendReminders.length > 0) {
+        console.log(`Found ${backendReminders.length} reminders on backend`);
+
+        // Decrypt and reconstruct reminders
+        const decryptedReminders: Reminder[] = [];
+
+        for (const backendReminder of backendReminders) {
+          try {
+            // Decrypt task (stored in title field)
+            const task = backendReminder.title
+              ? decrypt(backendReminder.title, keys.privateKey)
+              : "";
+
+            // Decrypt metadata (stored in description field)
+            let metadata: any = {};
+            if (backendReminder.description) {
+              const metadataJson = decrypt(backendReminder.description, keys.privateKey);
+              metadata = JSON.parse(metadataJson);
+            }
+
+            // Reconstruct the reminder object
+            const reminder: Reminder = {
+              id: backendReminder.id,
+              task,
+              trigger: metadata.trigger || "arriving",
+              recurrence: metadata.recurrence || { type: "once" },
+              location: backendReminder.location,
+              locationName: metadata.locationName || "Unknown",
+              radius: backendReminder.radius,
+              dwellTime: metadata.dwellTime,
+              assignees: metadata.assignees,
+              status: backendReminder.status,
+              createdAt: backendReminder.createdAt,
+              archivedAt: backendReminder.archivedAt,
+            };
+
+            decryptedReminders.push(reminder);
+          } catch (error) {
+            console.error(`Failed to decrypt reminder ${backendReminder.id}:`, error);
+            // Skip this reminder but continue with others
+          }
+        }
+
+        if (decryptedReminders.length > 0) {
+          console.log(`Successfully decrypted ${decryptedReminders.length} reminders`);
+          setReminders(decryptedReminders);
+          saveReminders(decryptedReminders);
+        }
+      } else {
+        console.log("No reminders found on backend");
+      }
+    } catch (error) {
+      console.error("Failed to sync from backend:", error);
+      // Don't throw - keep using local data if backend sync fails
     }
   };
 
@@ -101,7 +193,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       const metadata = {
         trigger: reminder.trigger,
         recurrence: reminder.recurrence,
-        assignee: reminder.assignee,
+        assignees: reminder.assignees,
         locationName: reminder.locationName,
         dwellTime: reminder.dwellTime,
         weeklyDays: reminder.weeklyDays,

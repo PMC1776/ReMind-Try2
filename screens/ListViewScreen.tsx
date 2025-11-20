@@ -3,7 +3,6 @@ import { View, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity, Press
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "../components/ThemedText";
 import { ReminderCard } from "../components/ReminderCard";
-import { FilterChip } from "../components/FilterChip";
 import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/Button";
 import { EditReminderModal } from "../components/EditReminderModal";
@@ -12,13 +11,12 @@ import { ScreenScrollView } from "../components/ScreenScrollView";
 import { useTheme } from "../hooks/useTheme";
 import { useReminders } from "../hooks/useReminders";
 import { Spacing, BorderRadius } from "../constants/theme";
-import { TriggerType, ReminderStatus } from "../types";
+import { ReminderStatus } from "../types";
 
 export default function ListViewScreen() {
   const { colors } = useTheme();
   const { reminders, updateReminder, archiveReminder, restoreReminder, batchArchive, batchRestore, batchDelete } = useReminders();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | TriggerType>("all");
   const [viewMode, setViewMode] = useState<ReminderStatus>("active");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -31,8 +29,7 @@ export default function ListViewScreen() {
   const filteredReminders = filteredByStatus.filter((reminder) => {
     const matchesSearch = reminder.task.toLowerCase().includes(searchQuery.toLowerCase()) ||
       reminder.locationName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterType === "all" || reminder.trigger === filterType;
-    return matchesSearch && matchesFilter;
+    return matchesSearch;
   });
 
   const toggleSelection = (id: string) => {
@@ -193,14 +190,16 @@ export default function ListViewScreen() {
   };
 
   return (
-    <ScreenScrollView style={{ backgroundColor: colors.backgroundRoot }}>
+    <ScreenScrollView style={{ backgroundColor: colors.background }}>
       {/* Header with View Mode Toggle and Selection Button */}
       <View style={styles.headerContainer}>
         <View style={styles.viewModeContainer}>
           <TouchableOpacity
             style={[
               styles.viewModeButton,
-              viewMode === "active" && { backgroundColor: colors.primary },
+              {
+                backgroundColor: viewMode === "active" ? colors.primary : colors.surfaceSecondary,
+              },
             ]}
             onPress={() => {
               setViewMode("active");
@@ -211,7 +210,9 @@ export default function ListViewScreen() {
             <ThemedText
               style={[
                 styles.viewModeText,
-                viewMode === "active" && styles.viewModeTextActive,
+                {
+                  color: viewMode === "active" ? colors.buttonText : colors.textPrimary,
+                },
               ]}
             >
               Active
@@ -220,7 +221,9 @@ export default function ListViewScreen() {
           <TouchableOpacity
             style={[
               styles.viewModeButton,
-              viewMode === "archived" && { backgroundColor: colors.primary },
+              {
+                backgroundColor: viewMode === "archived" ? colors.primary : colors.surfaceSecondary,
+              },
             ]}
             onPress={() => {
               setViewMode("archived");
@@ -231,7 +234,9 @@ export default function ListViewScreen() {
             <ThemedText
               style={[
                 styles.viewModeText,
-                viewMode === "archived" && styles.viewModeTextActive,
+                {
+                  color: viewMode === "archived" ? colors.buttonText : colors.textPrimary,
+                },
               ]}
             >
               Archived
@@ -254,7 +259,7 @@ export default function ListViewScreen() {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: colors.backgroundDefault }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary }]}>
           <Feather name="search" size={20} color={colors.tabIconDefault} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
@@ -265,29 +270,6 @@ export default function ListViewScreen() {
           />
         </View>
       </View>
-
-      {/* Filter Chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterContainer}
-      >
-        <FilterChip
-          label="All"
-          selected={filterType === "all"}
-          onPress={() => setFilterType("all")}
-        />
-        <FilterChip
-          label="Arriving"
-          selected={filterType === "arriving"}
-          onPress={() => setFilterType("arriving")}
-        />
-        <FilterChip
-          label="Leaving"
-          selected={filterType === "leaving"}
-          onPress={() => setFilterType("leaving")}
-        />
-      </ScrollView>
 
       {/* Select All in Selection Mode */}
       {selectionMode && filteredReminders.length > 0 && (
@@ -340,7 +322,6 @@ export default function ListViewScreen() {
                   locationName={reminder.locationName}
                   trigger={reminder.trigger}
                   recurrence={reminder.recurrence}
-                  weeklyDays={reminder.weeklyDays}
                   onPress={() => handleReminderPress(reminder.id)}
                 />
               </View>
@@ -351,7 +332,7 @@ export default function ListViewScreen() {
 
       {/* Batch Action Buttons */}
       {selectionMode && selectedIds.length > 0 && (
-        <View style={[styles.batchActionsContainer, { backgroundColor: colors.backgroundRoot, borderTopColor: colors.border }]}>
+        <View style={[styles.batchActionsContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           {viewMode === "active" && (
             <Button
               title={`Archive (${selectedIds.length})`}
@@ -412,15 +393,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.md,
-    backgroundColor: "#8B9AA3",
   },
   viewModeText: {
-    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
-  },
-  viewModeTextActive: {
-    color: "#FFFFFF",
   },
   selectButton: {
     paddingHorizontal: 12,
@@ -441,10 +417,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
     fontSize: 16,
-  },
-  filterContainer: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
   },
   selectAllContainer: {
     flexDirection: "row",

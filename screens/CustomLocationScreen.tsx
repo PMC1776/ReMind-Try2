@@ -14,6 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../hooks/useTheme";
 import { useLocationPermission } from "../hooks/useLocationPermission";
 import { useDebounce } from "../hooks/useDebounce";
+import { useReminders } from "../hooks/useReminders";
 import {
   searchLocation,
   formatAddress,
@@ -37,6 +38,7 @@ export default function CustomLocationScreen({
   onSelect,
 }: CustomLocationScreenProps) {
   const { colors } = useTheme();
+  const { settings } = useReminders();
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,22 +67,11 @@ export default function CustomLocationScreen({
 
       searchLocation(debouncedSearchTerm, stablePosition || undefined)
         .then((data) => {
-          // Filter by max distance (100km)
-          let filtered = data;
+          // No distance filtering - allow global search
+          // Sort by proximity if user position is available
+          let results = data;
           if (stablePosition) {
-            const MAX_DISTANCE_KM = 100;
-            filtered = data.filter((result) => {
-              const distance = calculateDistance(
-                stablePosition.latitude,
-                stablePosition.longitude,
-                parseFloat(result.lat),
-                parseFloat(result.lon)
-              );
-              return distance <= MAX_DISTANCE_KM;
-            });
-
-            // Sort by proximity
-            filtered.sort((a, b) => {
+            results.sort((a, b) => {
               const distA = calculateDistance(
                 stablePosition.latitude,
                 stablePosition.longitude,
@@ -96,7 +87,7 @@ export default function CustomLocationScreen({
               return distA - distB;
             });
           }
-          setResults(filtered);
+          setResults(results);
         })
         .catch((err) => {
           console.error("Search error:", err);
@@ -213,7 +204,7 @@ export default function CustomLocationScreen({
                         </Text>
                         {distance !== null && (
                           <Text style={[styles.distanceText, { color: colors.tabIconDefault }]}>
-                            {formatDistance(distance)} away
+                            {formatDistance(distance, settings.distanceUnit)} away
                           </Text>
                         )}
                       </View>

@@ -12,7 +12,6 @@ interface ReminderCardProps {
   locationName: string;
   trigger: TriggerType;
   recurrence: RecurrenceType;
-  weeklyDays?: number[];
   onPress: () => void;
 }
 
@@ -21,18 +20,23 @@ export function ReminderCard({
   locationName,
   trigger,
   recurrence,
-  weeklyDays,
   onPress,
 }: ReminderCardProps) {
   const { colors } = useTheme();
   const triggerColor = trigger === "arriving" ? colors.primary : colors.orange;
 
   const getRecurrenceText = () => {
-    if (recurrence === "once") return "Once";
-    if (recurrence === "eachTime") return "Each time";
-    if (recurrence === "weekly" && weeklyDays) {
+    if (recurrence.type === "once") return "Once";
+    if (recurrence.type === "eachTime") return "Always";
+    if (recurrence.type === "weekly" && recurrence.days) {
       const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      return weeklyDays.map((d) => days[d]).join(", ");
+      const selectedDays = recurrence.days
+        .map((isSelected, index) => (isSelected ? index : -1))
+        .filter((index) => index !== -1);
+      return selectedDays.map((d) => days[d]).join(", ");
+    }
+    if (recurrence.type === "specific_dates" && recurrence.dates) {
+      return `${recurrence.dates.length} specific date${recurrence.dates.length !== 1 ? "s" : ""}`;
     }
     return "";
   };
@@ -47,8 +51,8 @@ export function ReminderCard({
       onPress={handlePress}
       style={({ pressed }) => [
         styles.card,
-        { 
-          backgroundColor: colors.backgroundDefault,
+        {
+          backgroundColor: colors.surface,
           opacity: pressed ? 0.8 : 1,
         },
       ]}
@@ -81,9 +85,14 @@ export function ReminderCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: BorderRadius.xs,
+    borderRadius: BorderRadius.md,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   header: {
     flexDirection: "row",

@@ -9,15 +9,15 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useReminders } from "@/hooks/useReminders";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
+import type { SettingsStackParamList } from "@/navigation/SettingsStackNavigator";
 import * as Haptics from "expo-haptics";
 
-type Props = NativeStackScreenProps<ProfileStackParamList, "Profile">;
+type Props = NativeStackScreenProps<SettingsStackParamList, "Settings">;
 
 export default function ProfileScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const { user, logout } = useAuth();
-  const { settings, updateSettings } = useReminders();
+  const { settings } = useReminders();
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -35,6 +35,11 @@ export default function ProfileScreen({ navigation }: Props) {
   const handleArchive = () => {
     Haptics.selectionAsync();
     navigation.navigate("Archive");
+  };
+
+  const handleAdvancedSettings = () => {
+    Haptics.selectionAsync();
+    navigation.navigate("AdvancedSettings");
   };
 
   const handleNotificationTest = () => {
@@ -62,38 +67,32 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <ScreenScrollView style={{ backgroundColor: colors.backgroundRoot }}>
+    <ScreenScrollView style={{ backgroundColor: colors.background }}>
       <View style={styles.section}>
         <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.backgroundDefault }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <ThemedText style={styles.email}>{user?.email}</ThemedText>
           <ThemedText style={[styles.label, { color: colors.tabIconDefault }]}>
             User ID: {user?.id}
           </ThemedText>
         </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.menuItem,
+            { backgroundColor: colors.surface, opacity: pressed ? 0.6 : 1 },
+          ]}
+          onPress={handleAdvancedSettings}
+        >
+          <ThemedText>Advanced Settings</ThemedText>
+          <Feather name="chevron-right" size={20} color={colors.tabIconDefault} />
+        </Pressable>
         <Button title="Archive" onPress={handleArchive} />
         <Button title="Logout" onPress={handleLogout} variant="outline" />
       </View>
 
       <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Location Settings</ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.backgroundDefault }]}>
-          <ThemedText style={styles.label}>Default Radius</ThemedText>
-          <ThemedText>{settings.defaultRadius}m</ThemedText>
-        </View>
-        <View style={[styles.card, { backgroundColor: colors.backgroundDefault }]}>
-          <ThemedText style={styles.label}>Accuracy Mode</ThemedText>
-          <ThemedText style={{ textTransform: "capitalize" }}>{settings.accuracyMode}</ThemedText>
-        </View>
-        <View style={[styles.card, { backgroundColor: colors.backgroundDefault }]}>
-          <ThemedText style={styles.label}>Dwell Time</ThemedText>
-          <ThemedText>{settings.dwellTime}s</ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <ThemedText style={styles.sectionTitle}>Notifications</ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.backgroundDefault }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <ThemedText>Notifications</ThemedText>
           <ThemedText style={{ color: settings.notificationsEnabled ? colors.success : colors.danger }}>
             {settings.notificationsEnabled ? "Enabled" : "Disabled"}
@@ -107,7 +106,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <Pressable
           style={({ pressed }) => [
             styles.menuItem,
-            { backgroundColor: colors.backgroundDefault, opacity: pressed ? 0.6 : 1 },
+            { backgroundColor: colors.surface, opacity: pressed ? 0.6 : 1 },
           ]}
           onPress={() => Alert.alert("Change Password", "This feature is coming soon!")}
         >
@@ -117,7 +116,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <Pressable
           style={({ pressed }) => [
             styles.menuItem,
-            { backgroundColor: colors.backgroundDefault, opacity: pressed ? 0.6 : 1 },
+            { backgroundColor: colors.surface, opacity: pressed ? 0.6 : 1 },
           ]}
           onPress={() => Alert.alert("Recovery Key", "Your recovery key is securely stored.")}
         >
@@ -157,8 +156,13 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: Spacing.lg,
-    borderRadius: BorderRadius.xs,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   email: {
     fontSize: 16,
@@ -174,8 +178,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: Spacing.lg,
-    borderRadius: BorderRadius.xs,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   version: {
     fontSize: 14,
