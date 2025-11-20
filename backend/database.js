@@ -95,6 +95,20 @@ const initDatabase = async () => {
       )
     `);
 
+    // Create location_presets table
+    await query(`
+      CREATE TABLE IF NOT EXISTS location_presets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        coordinates JSONB NOT NULL,
+        address TEXT,
+        icon VARCHAR(10),
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better performance
     await query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
@@ -110,6 +124,10 @@ const initDatabase = async () => {
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email)
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_location_presets_user_id ON location_presets(user_id)
     `);
 
     console.log('✅ Database initialized successfully');

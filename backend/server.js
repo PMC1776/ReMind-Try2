@@ -594,6 +594,129 @@ app.post('/reminders/batch-delete', authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== LOCATION PRESETS ENDPOINTS ====================
+
+// GET /location-presets
+app.get('/location-presets', authenticateToken, async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT * FROM location_presets WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+
+    res.json({ presets: result.rows });
+  } catch (error) {
+    console.error('Get location presets error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST /location-presets
+app.post('/location-presets', authenticateToken, async (req, res) => {
+  try {
+    const { name, coordinates, address, icon } = req.body;
+
+    if (!name || !coordinates) {
+      return res.status(400).json({ message: 'Name and coordinates are required' });
+    }
+
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    const result = await query(
+      'INSERT INTO location_presets (user_id, name, coordinates, address, icon, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [req.user.id, name, JSON.stringify(coordinates), address, icon, createdAt]
+    );
+
+    res.status(201).json({ preset: result.rows[0] });
+  } catch (error) {
+    console.error('Create location preset error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// PATCH /location-presets/:id
+app.patch('/location-presets/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, coordinates, address, icon } = req.body;
+
+    // Verify ownership
+    const existingResult = await query(
+      'SELECT * FROM location_presets WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Location preset not found' });
+    }
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (coordinates !== undefined) {
+      updates.push(`coordinates = $${paramCount++}`);
+      values.push(JSON.stringify(coordinates));
+    }
+    if (address !== undefined) {
+      updates.push(`address = $${paramCount++}`);
+      values.push(address);
+    }
+    if (icon !== undefined) {
+      updates.push(`icon = $${paramCount++}`);
+      values.push(icon);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ message: 'No fields to update' });
+    }
+
+    values.push(id, req.user.id);
+
+    const result = await query(
+      `UPDATE location_presets SET ${updates.join(', ')} WHERE id = $${paramCount} AND user_id = $${paramCount + 1} RETURNING *`,
+      values
+    );
+
+    res.json({ preset: result.rows[0] });
+  } catch (error) {
+    console.error('Update location preset error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE /location-presets/:id
+app.delete('/location-presets/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify ownership
+    const existingResult = await query(
+      'SELECT * FROM location_presets WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Location preset not found' });
+    }
+
+    await query(
+      'DELETE FROM location_presets WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    res.json({ message: 'Location preset deleted successfully' });
+  } catch (error) {
+    console.error('Delete location preset error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // ==================== SETTINGS ENDPOINTS ====================
 
 // GET /settings
