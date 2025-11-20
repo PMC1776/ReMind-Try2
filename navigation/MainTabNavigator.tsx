@@ -127,7 +127,7 @@ export default function MainTabNavigator() {
     <SuccessConfetti
       show={showConfetti}
       onComplete={() => setShowConfetti(false)}
-      color="primary"
+      color="coral"
     />
     </>
   );

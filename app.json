@@ -72,7 +72,7 @@
       [
         "react-native-maps",
         {
-          "googleMapsApiKey": "AIzaSyAGohtmpCOxqO88_AMJ6LWNp4jnl1wpFaY"
+          "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
         }
       ],
       "expo-web-browser",

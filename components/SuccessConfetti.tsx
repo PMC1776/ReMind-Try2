@@ -17,7 +17,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 interface SuccessConfettiProps {
   show: boolean;
   onComplete: () => void;
-  color?: "primary" | "orange";
+  color?: "primary" | "orange" | "coral";
 }
 
 interface Particle {
@@ -38,6 +38,11 @@ const primaryColors = [
 const orangeColors = [
   "#FF8C00", "#FFA500", "#FFB347", "#FF7F00",
   "#FFAA33", "#FF9933", "#FFB84D", "#FF8533",
+];
+
+const coralColors = [
+  "#FF6B6B", "#FF8585", "#FF9999", "#E85555",
+  "#FFA0A0", "#FFB8B8", "#FFD0D0", "#FFE5E5",
 ];
 
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
@@ -128,7 +133,7 @@ export default function SuccessConfetti({
       ringOpacity.value = withTiming(0, { duration: 600, easing: Easing.out(Easing.quad) });
 
       // Generate particles
-      const colors = color === "orange" ? orangeColors : primaryColors;
+      const colors = color === "orange" ? orangeColors : color === "coral" ? coralColors : primaryColors;
       const newParticles: Particle[] = Array.from({ length: 40 }, (_, i) => {
         const angle = (i / 40) * Math.PI * 2;
         const distance = 150 + Math.random() * 100;
@@ -176,8 +181,8 @@ export default function SuccessConfetti({
 
   if (!show) return null;
 
-  const bgColor = color === "orange" ? "#F97316" : "#3B82F6";
-  const borderColor = color === "orange" ? "#F97316" : "#3B82F6";
+  const bgColor = color === "orange" ? "#F97316" : color === "coral" ? "#FF6B6B" : "#3B82F6";
+  const borderColor = color === "orange" ? "#F97316" : color === "coral" ? "#FF6B6B" : "#3B82F6";
 
   return (
     <Animated.View style={[styles.container, containerStyle]} pointerEvents="none">

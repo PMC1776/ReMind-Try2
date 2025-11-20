@@ -106,7 +106,7 @@ export default function ListViewScreen() {
   const handleArchive = async (id: string) => {
     try {
       await archiveReminder(id);
-      Alert.alert("Success", "Reminder archived");
+      setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to archive reminder");
     }
@@ -190,6 +190,7 @@ export default function ListViewScreen() {
   };
 
   return (
+    <>
     <ScreenScrollView style={{ backgroundColor: colors.background }}>
       {/* Header with View Mode Toggle and Selection Button */}
       <View style={styles.headerContainer}>
@@ -365,14 +366,15 @@ export default function ListViewScreen() {
         }}
         onSave={handleSaveEdit}
       />
-
-      {/* Success Confetti */}
-      <SuccessConfetti
-        show={showConfetti}
-        onComplete={() => setShowConfetti(false)}
-        color="orange"
-      />
     </ScreenScrollView>
+
+    {/* Success Confetti - outside scroll view so it's fixed to viewport */}
+    <SuccessConfetti
+      show={showConfetti}
+      onComplete={() => setShowConfetti(false)}
+      color="coral"
+    />
+    </>
   );
 }
 

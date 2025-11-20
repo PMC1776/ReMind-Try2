@@ -91,6 +91,14 @@ export function encrypt(text: string, publicKey: string): string {
 
 export function decrypt(encryptedText: string, privateKey: string): string {
   try {
+    // Validate input
+    if (typeof encryptedText !== 'string') {
+      throw new Error(`Expected string, got ${typeof encryptedText}`);
+    }
+    if (!encryptedText) {
+      throw new Error('Encrypted text is empty');
+    }
+
     // Decode the full message from base64
     const fullMessageBytes = decodeBase64(encryptedText);
     const fullMessage = new Uint8Array(fullMessageBytes as any);

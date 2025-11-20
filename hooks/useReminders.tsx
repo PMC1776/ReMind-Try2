@@ -90,31 +90,38 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         remindersAPI.getAll("archived"),
       ]);
 
-      const backendReminders = [...(activeData.reminders || []), ...(archivedData.reminders || [])];
+      // Backend returns array directly, not wrapped in .reminders
+      const backendReminders = [...(Array.isArray(activeData) ? activeData : []), ...(Array.isArray(archivedData) ? archivedData : [])];
 
       if (backendReminders.length > 0) {
         console.log(`Found ${backendReminders.length} reminders on backend`);
+        console.log("First backend reminder sample:", JSON.stringify(backendReminders[0], null, 2));
 
         // Decrypt and reconstruct reminders
         const decryptedReminders: Reminder[] = [];
 
         for (const backendReminder of backendReminders) {
           try {
+            console.log(`Decrypting reminder ${backendReminder.id}...`);
+            console.log(`  - title type: ${typeof backendReminder.title}`);
+            console.log(`  - description type: ${typeof backendReminder.description}`);
+
+            // Skip reminders with null/undefined encrypted fields
+            if (!backendReminder.title || !backendReminder.description) {
+              console.log(`⚠️ Skipping reminder ${backendReminder.id} - missing encrypted data`);
+              continue;
+            }
+
             // Decrypt task (stored in title field)
-            const task = backendReminder.title
-              ? decrypt(backendReminder.title, keys.privateKey)
-              : "";
+            const task = decrypt(backendReminder.title, keys.privateKey);
 
             // Decrypt metadata (stored in description field)
-            let metadata: any = {};
-            if (backendReminder.description) {
-              const metadataJson = decrypt(backendReminder.description, keys.privateKey);
-              metadata = JSON.parse(metadataJson);
-            }
+            const metadataJson = decrypt(backendReminder.description, keys.privateKey);
+            const metadata = JSON.parse(metadataJson);
 
             // Reconstruct the reminder object
             const reminder: Reminder = {
-              id: backendReminder.id,
+              id: backendReminder.id.toString(), // Convert backend integer ID to string
               task,
               trigger: metadata.trigger || "arriving",
               recurrence: metadata.recurrence || { type: "once" },
@@ -122,15 +129,19 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
               locationName: metadata.locationName || "Unknown",
               radius: backendReminder.radius,
               dwellTime: metadata.dwellTime,
-              assignees: metadata.assignees,
+              assignees: metadata.assignees || ["Me"],
               status: backendReminder.status,
-              createdAt: backendReminder.createdAt,
-              archivedAt: backendReminder.archivedAt,
+              createdAt: backendReminder.created_at || backendReminder.createdAt,
+              archivedAt: backendReminder.archived_at || backendReminder.archivedAt,
             };
 
             decryptedReminders.push(reminder);
+            console.log(`✅ Successfully decrypted reminder ${backendReminder.id}: "${task}"`);
           } catch (error) {
-            console.error(`Failed to decrypt reminder ${backendReminder.id}:`, error);
+            console.error(`❌ Failed to decrypt reminder ${backendReminder.id}:`, error);
+            if (error instanceof Error) {
+              console.error("Decrypt error details:", error.message);
+            }
             // Skip this reminder but continue with others
           }
         }
@@ -150,44 +161,47 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
   };
 
   const addReminder = async (reminder: Omit<Reminder, "id" | "createdAt" | "status">) => {
-    const newReminder: Reminder = {
-      ...reminder,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      status: "active",
-    };
-
-    // Save locally first (offline-first approach)
-    const updated = [...reminders, newReminder];
-    setReminders(updated);
-    saveReminders(updated);
-
-    // Sync with backend
     try {
-      console.log("Starting backend sync...");
-
+      console.log("🔵 Starting addReminder...");
       const user = await secureStorage.getItem("user");
       if (!user) {
         console.log("No user found, skipping backend sync");
+        // Create local-only reminder if offline
+        const tempId = Date.now().toString();
+        const newReminder: Reminder = {
+          ...reminder,
+          id: tempId,
+          createdAt: new Date().toISOString(),
+          status: "active",
+        };
+        const updated = [...reminders, newReminder];
+        setReminders(updated);
+        saveReminders(updated);
         return;
       }
 
-      console.log("User found, loading encryption keys...");
-
+      console.log("🔵 User found, getting encryption keys...");
       // Get encryption keys
       const keys = await loadKeys();
       if (!keys || !keys.publicKey) {
-        console.log("No encryption keys found, skipping backend sync");
+        console.log("No encryption keys found, creating local reminder");
+        const tempId = Date.now().toString();
+        const newReminder: Reminder = {
+          ...reminder,
+          id: tempId,
+          createdAt: new Date().toISOString(),
+          status: "active",
+        };
+        const updated = [...reminders, newReminder];
+        setReminders(updated);
+        saveReminders(updated);
         return;
       }
 
-      console.log("Encryption keys loaded, encrypting reminder data...");
-      console.log("Task to encrypt:", reminder.task);
-      console.log("Public key length:", keys.publicKey.length);
+      console.log("🔵 Encrypting reminder data...");
 
       // Encrypt sensitive data
       const encryptedTask = encrypt(reminder.task, keys.publicKey);
-      console.log("Task encrypted successfully");
 
       // Encrypt all metadata as JSON in description
       const metadata = {
@@ -198,16 +212,12 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         dwellTime: reminder.dwellTime,
         weeklyDays: reminder.weeklyDays,
       };
-      const metadataJson = JSON.stringify(metadata);
-      console.log("Metadata to encrypt:", metadataJson);
+      const encryptedDescription = encrypt(JSON.stringify(metadata), keys.publicKey);
 
-      const encryptedDescription = encrypt(metadataJson, keys.publicKey);
-      console.log("Metadata encrypted successfully");
+      console.log("🔵 Sending to backend API...");
 
-      console.log("Sending to backend API...");
-
-      // Send to backend
-      const response = await remindersAPI.create({
+      // Send to backend FIRST to get the real ID
+      const backendReminder = await remindersAPI.create({
         title: encryptedTask,
         description: encryptedDescription,
         location: {
@@ -217,15 +227,45 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         radius: reminder.radius,
       });
 
-      console.log("✅ Reminder synced to backend successfully:", response);
+      console.log("✅ Backend response:", JSON.stringify(backendReminder, null, 2));
+      console.log("✅ Backend ID:", backendReminder.id);
+      console.log("✅ Backend ID type:", typeof backendReminder.id);
+
+      // NOW save locally with the backend ID
+      const newReminder: Reminder = {
+        ...reminder,
+        id: backendReminder.id.toString(),
+        createdAt: backendReminder.created_at || backendReminder.createdAt || new Date().toISOString(),
+        status: "active",
+      };
+
+      console.log("🔵 Saving locally with ID:", newReminder.id);
+      const updated = [...reminders, newReminder];
+      setReminders(updated);
+      saveReminders(updated);
+      console.log("✅ Local reminder saved with backend ID:", backendReminder.id);
     } catch (error) {
-      console.error("❌ Failed to sync reminder to backend:", error);
+      console.error("❌ Failed to create reminder on backend:", error);
       if (error instanceof Error) {
-        console.error("Error name:", error.name);
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
+        console.error("Error details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
       }
-      // Don't remove local reminder even if backend sync fails
+      console.log("⚠️ Falling back to local-only reminder with temp ID");
+      // Fallback: save locally with temp ID if backend fails
+      const tempId = Date.now().toString();
+      const newReminder: Reminder = {
+        ...reminder,
+        id: tempId,
+        createdAt: new Date().toISOString(),
+        status: "active",
+      };
+      const updated = [...reminders, newReminder];
+      setReminders(updated);
+      saveReminders(updated);
+      console.log("⚠️ Saved locally with temp ID:", tempId);
     }
   };
 

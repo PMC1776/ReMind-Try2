@@ -2,7 +2,7 @@ import axios from "axios";
 import { secureStorage } from "./secureStorage";
 
 // Backend deployed on Render
-const API_BASE_URL = "https://remind-backend-nl3g.onrender.com";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://remind-backend-nl3g.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
