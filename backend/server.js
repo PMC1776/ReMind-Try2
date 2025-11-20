@@ -482,15 +482,12 @@ app.post('/reminders/:id/archive', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Unix timestamp in SECONDS (not milliseconds)
-    const archivedAt = Math.floor(Date.now() / 1000);
-
     const result = await query(
       `UPDATE reminders
-       SET status = 'archived', archived_at = to_timestamp($1)
-       WHERE id = $2 AND user_id = $3
+       SET status = 'archived', archived_at = NOW()
+       WHERE id = $1 AND user_id = $2
        RETURNING *`,
-      [archivedAt, id, req.user.id]
+      [id, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -500,33 +497,6 @@ app.post('/reminders/:id/archive', authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Archive reminder error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-// POST /reminders/batch-archive
-app.post('/reminders/batch-archive', authenticateToken, async (req, res) => {
-  try {
-    const { ids } = req.body;
-
-    if (!Array.isArray(ids)) {
-      return res.status(400).json({ message: 'ids must be an array' });
-    }
-
-    // Unix timestamp in SECONDS (not milliseconds)
-    const archivedAt = Math.floor(Date.now() / 1000);
-
-    const result = await query(
-      `UPDATE reminders
-       SET status = 'archived', archived_at = to_timestamp($1)
-       WHERE id = ANY($2::int[]) AND user_id = $3
-       RETURNING *`,
-      [archivedAt, ids, req.user.id]
-    );
-
-    res.json({ count: result.rowCount, reminders: result.rows });
-  } catch (error) {
-    console.error('Batch archive error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -551,6 +521,30 @@ app.post('/reminders/:id/restore', authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Restore reminder error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST /reminders/batch-archive
+app.post('/reminders/batch-archive', authenticateToken, async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({ message: 'ids must be an array' });
+    }
+
+    const result = await query(
+      `UPDATE reminders
+       SET status = 'archived', archived_at = NOW()
+       WHERE id = ANY($1::int[]) AND user_id = $2
+       RETURNING *`,
+      [ids, req.user.id]
+    );
+
+    res.json({ count: result.rowCount, reminders: result.rows });
+  } catch (error) {
+    console.error('Batch archive error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -681,6 +675,33 @@ app.get('/export', authenticateToken, async (req, res) => {
     res.json(exportData);
   } catch (error) {
     console.error('Export error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ==================== CLEANUP ENDPOINT (TEMPORARY) ====================
+
+// DELETE /cleanup-user-reminders/:userId
+app.delete('/cleanup-user-reminders/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Only allow deletion for user_id 2 as a safety measure
+    if (userId !== '2') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const result = await query(
+      'DELETE FROM reminders WHERE user_id = $1',
+      [userId]
+    );
+
+    res.json({
+      message: 'All reminders deleted successfully',
+      count: result.rowCount
+    });
+  } catch (error) {
+    console.error('Cleanup error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
