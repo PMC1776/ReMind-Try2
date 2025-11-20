@@ -28,7 +28,7 @@ export interface EncryptionKeys {
 export async function generateKeypair(): Promise<EncryptionKeys> {
   // Generate random bytes for the seed using expo-crypto
   const seed = Crypto.getRandomBytes(32);
-  const keypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(seed));
+  const keypair = nacl.box.keyPair.fromSecretKey(Uint8Array.from(seed));
   return {
     publicKey: encodeBase64(keypair.publicKey),
     privateKey: encodeBase64(keypair.secretKey),
@@ -46,21 +46,21 @@ export async function loadKeys(): Promise<EncryptionKeys | null> {
 
 export function encrypt(text: string, publicKey: string): string {
   try {
-    // Convert text to Uint8Array
-    const messageBytes = encodeUTF8(text);
-    const messageUint8 = new Uint8Array(messageBytes as any);
+    // Convert text to Uint8Array using TextEncoder for better React Native compatibility
+    const encoder = new TextEncoder();
+    const messageUint8 = encoder.encode(text);
 
     // Decode public key from base64 to Uint8Array
     const publicKeyBytes = decodeBase64(publicKey);
-    const publicKeyUint8 = new Uint8Array(publicKeyBytes as any);
+    const publicKeyUint8 = Uint8Array.from(publicKeyBytes as any);
 
-    // Generate random nonce
+    // Generate random nonce - use Uint8Array.from() for React Native compatibility
     const nonceBytes = Crypto.getRandomBytes(nacl.box.nonceLength);
-    const nonce = new Uint8Array(nonceBytes);
+    const nonce = Uint8Array.from(nonceBytes);
 
     // Generate ephemeral keypair for this encryption
     const ephemeralSeed = Crypto.getRandomBytes(32);
-    const ephemeralKeypair = nacl.box.keyPair.fromSecretKey(new Uint8Array(ephemeralSeed));
+    const ephemeralKeypair = nacl.box.keyPair.fromSecretKey(Uint8Array.from(ephemeralSeed));
 
     // Encrypt the message
     const encrypted = nacl.box(
@@ -84,24 +84,39 @@ export function encrypt(text: string, publicKey: string): string {
 
     return encodeBase64(fullMessage);
   } catch (error) {
-    console.error("Encryption error details:", error);
+    console.error("Encryption error:", error);
     throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 export function decrypt(encryptedText: string, privateKey: string): string {
   try {
-    // Validate input
+    // Force to string to handle any weird type coercion issues
+    const encryptedStr = String(encryptedText);
+    const privateKeyStr = String(privateKey);
+
+    // Validate input types
     if (typeof encryptedText !== 'string') {
-      throw new Error(`Expected string, got ${typeof encryptedText}`);
+      throw new Error(`encryptedText: expected string, got ${typeof encryptedText}`);
+    }
+    if (typeof privateKey !== 'string') {
+      throw new Error(`privateKey: expected string, got ${typeof privateKey}`);
     }
     if (!encryptedText) {
       throw new Error('Encrypted text is empty');
     }
+    if (!privateKey) {
+      throw new Error('Private key is empty');
+    }
 
     // Decode the full message from base64
-    const fullMessageBytes = decodeBase64(encryptedText);
-    const fullMessage = new Uint8Array(fullMessageBytes as any);
+    let fullMessageBytes;
+    try {
+      fullMessageBytes = decodeBase64(encryptedStr);
+    } catch (e) {
+      throw new Error(`Failed to decode encrypted text from base64: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const fullMessage = Uint8Array.from(fullMessageBytes as any);
 
     // Extract nonce, ephemeral public key, and encrypted message
     const nonce = fullMessage.slice(0, nacl.box.nonceLength);
@@ -114,8 +129,13 @@ export function decrypt(encryptedText: string, privateKey: string): string {
     );
 
     // Decode private key from base64
-    const privateKeyBytes = decodeBase64(privateKey);
-    const privateKeyUint8 = new Uint8Array(privateKeyBytes as any);
+    let privateKeyBytes;
+    try {
+      privateKeyBytes = decodeBase64(privateKeyStr);
+    } catch (e) {
+      throw new Error(`Failed to decode private key from base64: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const privateKeyUint8 = Uint8Array.from(privateKeyBytes as any);
 
     // Decrypt the message
     const decrypted = nacl.box.open(
@@ -129,10 +149,18 @@ export function decrypt(encryptedText: string, privateKey: string): string {
       throw new Error("Decryption failed - message could not be authenticated");
     }
 
-    return decodeUTF8(decrypted);
+    // Use TextDecoder for UTF8 decoding (better React Native compatibility than tweetnacl-util)
+    try {
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(decrypted);
+    } catch (e) {
+      // Fallback: Manual UTF8 decoding
+      const bytes = Array.from(decrypted);
+      return bytes.map(byte => String.fromCharCode(byte)).join('');
+    }
   } catch (error) {
-    console.error("Decryption error details:", error);
-    throw new Error(`Decryption failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error("Decryption error:", error);
+    throw error;
   }
 }
 
@@ -144,7 +172,7 @@ export function restoreFromRecoveryKey(recoveryKey: string): EncryptionKeys {
   try {
     const privateKey = recoveryKey;
     const privateKeyBytes = decodeBase64(privateKey);
-    const privateKeyUint8 = new Uint8Array(privateKeyBytes as any);
+    const privateKeyUint8 = Uint8Array.from(privateKeyBytes as any);
     const keypair = nacl.box.keyPair.fromSecretKey(privateKeyUint8);
 
     return {

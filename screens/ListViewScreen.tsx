@@ -6,6 +6,8 @@ import { ReminderCard } from "../components/ReminderCard";
 import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/Button";
 import { EditReminderModal } from "../components/EditReminderModal";
+import { ReminderOptionsModal } from "../components/ReminderOptionsModal";
+import { DeleteConfirmationModal } from "../components/DeleteConfirmationModal";
 import SuccessConfetti from "../components/SuccessConfetti";
 import { ScreenScrollView } from "../components/ScreenScrollView";
 import { useTheme } from "../hooks/useTheme";
@@ -22,7 +24,12 @@ export default function ListViewScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [reminderToEdit, setReminderToEdit] = useState<{ id: string; task: string } | null>(null);
+  const [optionsModalOpen, setOptionsModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState<{ id: string; task: string; locationName: string } | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiColor, setConfettiColor] = useState<"primary" | "orange" | "coral">("coral");
 
   const filteredByStatus = reminders.filter((r) => r.status === viewMode);
 
@@ -52,40 +59,21 @@ export default function ListViewScreen() {
       return;
     }
 
-    const isArchived = viewMode === "archived";
-
-    if (isArchived) {
-      // Archived reminders: Only show Restore option
-      Alert.alert(
-        "Archived Reminder",
-        "This reminder is archived. Would you like to restore it?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Restore", onPress: () => handleRestore(id), style: "default" },
-          { text: "Delete", onPress: () => handleDelete(id), style: "destructive" },
-        ]
-      );
-    } else {
-      // Active reminders: Show Edit, Archive, Delete options
-      const reminder = reminders.find(r => r.id === id);
-      Alert.alert(
-        "Reminder Options",
-        reminder?.task || "",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Edit", onPress: () => handleEdit(id), style: "default" },
-          { text: "Archive", onPress: () => handleArchive(id), style: "default" },
-          { text: "Delete", onPress: () => handleDelete(id), style: "destructive" },
-        ]
-      );
-    }
-  };
-
-  const handleEdit = (id: string) => {
     const reminder = reminders.find(r => r.id === id);
     if (!reminder) return;
 
-    setReminderToEdit({ id, task: reminder.task });
+    setSelectedReminder({
+      id: reminder.id,
+      task: reminder.task,
+      locationName: reminder.locationName,
+    });
+    setOptionsModalOpen(true);
+  };
+
+  const handleEdit = () => {
+    if (!selectedReminder) return;
+
+    setReminderToEdit({ id: selectedReminder.id, task: selectedReminder.task });
     setEditModalOpen(true);
   };
 
@@ -103,44 +91,44 @@ export default function ListViewScreen() {
     }
   };
 
-  const handleArchive = async (id: string) => {
+  const handleArchive = async () => {
+    if (!selectedReminder) return;
+
     try {
-      await archiveReminder(id);
+      await archiveReminder(selectedReminder.id);
+      setConfettiColor("coral");
       setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to archive reminder");
     }
   };
 
-  const handleRestore = async (id: string) => {
+  const handleRestore = async () => {
+    if (!selectedReminder) return;
+
     try {
-      await restoreReminder(id);
+      await restoreReminder(selectedReminder.id);
+      setConfettiColor("coral");
       setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to restore reminder");
     }
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      "Delete Reminder",
-      "Are you sure you want to permanently delete this reminder?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await batchDelete([id]);
-              Alert.alert("Success", "Reminder deleted");
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete reminder");
-            }
-          },
-        },
-      ]
-    );
+  const handleDelete = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedReminder) return;
+
+    try {
+      await batchDelete([selectedReminder.id]);
+      setConfettiColor("coral");
+      setShowConfetti(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to delete reminder");
+    }
   };
 
   const handleBatchArchive = async () => {
@@ -166,27 +154,19 @@ export default function ListViewScreen() {
   };
 
   const handleBatchDelete = () => {
-    Alert.alert(
-      "Delete Reminders",
-      `Are you sure you want to permanently delete ${selectedIds.length} reminder${selectedIds.length === 1 ? '' : 's'}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const count = await batchDelete(selectedIds);
-              setSelectedIds([]);
-              setSelectionMode(false);
-              Alert.alert("Success", `${count} reminder${count === 1 ? '' : 's'} deleted`);
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete reminders");
-            }
-          },
-        },
-      ]
-    );
+    setBatchDeleteConfirmOpen(true);
+  };
+
+  const confirmBatchDelete = async () => {
+    try {
+      const count = await batchDelete(selectedIds);
+      setSelectedIds([]);
+      setSelectionMode(false);
+      setConfettiColor("coral");
+      setShowConfetti(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to delete reminders");
+    }
   };
 
   return (
@@ -366,13 +346,45 @@ export default function ListViewScreen() {
         }}
         onSave={handleSaveEdit}
       />
+
+      {/* Options Modal */}
+      <ReminderOptionsModal
+        isOpen={optionsModalOpen}
+        onClose={() => {
+          setOptionsModalOpen(false);
+          setSelectedReminder(null);
+        }}
+        title={selectedReminder?.task || "Reminder Options"}
+        subtitle={selectedReminder?.locationName}
+        isArchived={viewMode === "archived"}
+        onEdit={viewMode === "active" ? handleEdit : undefined}
+        onArchive={viewMode === "active" ? handleArchive : undefined}
+        onRestore={viewMode === "archived" ? handleRestore : undefined}
+        onDelete={handleDelete}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Batch Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={batchDeleteConfirmOpen}
+        onClose={() => setBatchDeleteConfirmOpen(false)}
+        onConfirm={confirmBatchDelete}
+        title="Delete Reminders"
+        message={`Are you sure you want to permanently delete ${selectedIds.length} reminder${selectedIds.length === 1 ? '' : 's'}?`}
+      />
     </ScreenScrollView>
 
     {/* Success Confetti - outside scroll view so it's fixed to viewport */}
     <SuccessConfetti
       show={showConfetti}
       onComplete={() => setShowConfetti(false)}
-      color="coral"
+      color={confettiColor}
     />
     </>
   );
