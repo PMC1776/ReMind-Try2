@@ -501,6 +501,30 @@ app.post('/reminders/:id/archive', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /reminders/:id/restore
+app.post('/reminders/:id/restore', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      `UPDATE reminders
+       SET status = 'active', archived_at = NULL
+       WHERE id = $1 AND user_id = $2
+       RETURNING *`,
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Reminder not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Restore reminder error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // POST /reminders/batch-archive
 app.post('/reminders/batch-archive', authenticateToken, async (req, res) => {
   try {
@@ -518,9 +542,33 @@ app.post('/reminders/batch-archive', authenticateToken, async (req, res) => {
       [ids, req.user.id]
     );
 
-    res.json(result.rows);
+    res.json({ count: result.rowCount, reminders: result.rows });
   } catch (error) {
     console.error('Batch archive error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST /reminders/batch-restore
+app.post('/reminders/batch-restore', authenticateToken, async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({ message: 'ids must be an array' });
+    }
+
+    const result = await query(
+      `UPDATE reminders
+       SET status = 'active', archived_at = NULL
+       WHERE id = ANY($1::int[]) AND user_id = $2
+       RETURNING *`,
+      [ids, req.user.id]
+    );
+
+    res.json({ count: result.rowCount, reminders: result.rows });
+  } catch (error) {
+    console.error('Batch restore error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -539,7 +587,7 @@ app.post('/reminders/batch-delete', authenticateToken, async (req, res) => {
       [ids, req.user.id]
     );
 
-    res.json({ message: `${result.rowCount} reminders deleted successfully` });
+    res.json({ count: result.rowCount, message: `${result.rowCount} reminders deleted successfully` });
   } catch (error) {
     console.error('Batch delete error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -627,6 +675,33 @@ app.get('/export', authenticateToken, async (req, res) => {
     res.json(exportData);
   } catch (error) {
     console.error('Export error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ==================== CLEANUP ENDPOINT (TEMPORARY) ====================
+
+// DELETE /cleanup-user-reminders/:userId
+app.delete('/cleanup-user-reminders/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Only allow deletion for user_id 2 as a safety measure
+    if (userId !== '2') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const result = await query(
+      'DELETE FROM reminders WHERE user_id = $1',
+      [userId]
+    );
+
+    res.json({
+      message: 'All reminders deleted successfully',
+      count: result.rowCount
+    });
+  } catch (error) {
+    console.error('Cleanup error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
