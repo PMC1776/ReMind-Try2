@@ -118,4 +118,22 @@ export const exportAPI = {
   },
 };
 
+export const locationPresetsAPI = {
+  getAll: async () => {
+    const { data } = await api.get("/location-presets");
+    return data.presets || [];
+  },
+  create: async (preset: any) => {
+    const { data } = await api.post("/location-presets", preset);
+    return data.preset;
+  },
+  update: async (id: string, updates: any) => {
+    const { data } = await api.patch(`/location-presets/${id}`, updates);
+    return data.preset;
+  },
+  delete: async (id: string) => {
+    await api.delete(`/location-presets/${id}`);
+  },
+};
+
 export default api;

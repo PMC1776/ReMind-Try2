@@ -1,13 +1,14 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, StyleSheet, ActivityIndicator, Modal, Pressable, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Modal, Pressable, TouchableOpacity, Text, TextInput, FlatList, Keyboard, TouchableWithoutFeedback } from "react-native";
 import MapView, { Marker, Circle, MapPressEvent } from "react-native-maps";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedText } from "../components/ThemedText";
 import { useTheme } from "../hooks/useTheme";
 import { useReminders } from "../hooks/useReminders";
 import { useLocationPermission } from "../hooks/useLocationPermission";
+import { useDebounce } from "../hooks/useDebounce";
 import { Spacing, BorderRadius } from "../constants/theme";
-import { reverseGeocode } from "../services/locationService";
+import { reverseGeocode, searchLocation, formatAddress, calculateDistance, formatDistance, SearchResult } from "../services/locationService";
 import AddReminderSheet from "../components/AddReminderSheet";
 import * as Haptics from "expo-haptics";
 
@@ -18,11 +19,12 @@ interface TempMarker {
 
 export default function MapViewScreen() {
   const { colors } = useTheme();
-  const { reminders, addReminder, updateReminder, archiveReminder } = useReminders();
+  const { reminders, addReminder, updateReminder, archiveReminder, settings } = useReminders();
   const { position, isLoading, error } = useLocationPermission();
   const mapRef = useRef<MapView>(null);
 
   const [tempMarker, setTempMarker] = useState<TempMarker | null>(null);
+  const [searchMarker, setSearchMarker] = useState<{ coordinate: { latitude: number; longitude: number }; address: string } | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAddReminder, setShowAddReminder] = useState(false);
   const [prefilledLocation, setPrefilledLocation] = useState<{
@@ -32,7 +34,36 @@ export default function MapViewScreen() {
   const [selectedReminder, setSelectedReminder] = useState<any>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
 
+  // Search bar state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const activeReminders = reminders.filter((r) => r.status === "active");
+
+  // Group reminders by location (cluster nearby reminders)
+  const clusterReminders = (reminders: any[]) => {
+    const clusters: { [key: string]: any[] } = {};
+    const clusterDistance = 0.001; // ~100 meters
+
+    reminders.forEach((reminder) => {
+      const lat = Math.round(reminder.location.latitude / clusterDistance) * clusterDistance;
+      const lon = Math.round(reminder.location.longitude / clusterDistance) * clusterDistance;
+      const key = `${lat},${lon}`;
+
+      if (!clusters[key]) {
+        clusters[key] = [];
+      }
+      clusters[key].push(reminder);
+    });
+
+    return Object.values(clusters);
+  };
+
+  const reminderClusters = clusterReminders(activeReminders);
 
   // Debug: Log reminders
   useEffect(() => {
@@ -66,17 +97,82 @@ export default function MapViewScreen() {
         mapRef.current.animateToRegion({
           latitude: position.latitude,
           longitude: position.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitudeDelta: 0.3,
+          longitudeDelta: 0.3,
         }, 1000);
       }
     }
   }, [position, activeReminders.length]);
 
+  // Reset global search when search term changes
+  useEffect(() => {
+    setIsGlobalSearch(false);
+  }, [searchTerm]);
+
+  // Search effect
+  useEffect(() => {
+    if (debouncedSearchTerm.trim()) {
+      setIsSearching(true);
+      console.log(`Starting ${isGlobalSearch ? 'global' : 'local'} search for: "${debouncedSearchTerm}"`);
+
+      searchLocation(
+        debouncedSearchTerm,
+        position || undefined,
+        { global: isGlobalSearch, radiusMiles: 100 }
+      )
+        .then((data) => {
+          console.log(`Search results for "${debouncedSearchTerm}":`, data?.length || 0, 'results');
+          if (data && data.length > 0) {
+            console.log('First result:', {
+              name: data[0].display_name,
+              lat: data[0].lat,
+              lon: data[0].lon
+            });
+          }
+          // Sort by proximity if user position is available
+          let results = data || [];
+          if (position && results.length > 0) {
+            results.sort((a, b) => {
+              const distA = calculateDistance(
+                position.latitude,
+                position.longitude,
+                parseFloat(a.lat),
+                parseFloat(a.lon)
+              );
+              const distB = calculateDistance(
+                position.latitude,
+                position.longitude,
+                parseFloat(b.lat),
+                parseFloat(b.lon)
+              );
+              return distA - distB;
+            });
+          }
+          setSearchResults(results);
+          setShowSearchResults(true);
+        })
+        .catch((err) => {
+          console.error("Map search error:", err);
+          // Don't show error to user, just clear results
+          setSearchResults([]);
+          setShowSearchResults(true); // Still show dropdown to indicate "no results"
+        })
+        .finally(() => setIsSearching(false));
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  }, [debouncedSearchTerm, position, isGlobalSearch]);
+
   const handleMapPress = async (event: MapPressEvent) => {
     const { coordinate } = event.nativeEvent;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Clear search results when clicking on map
+    setSearchResults([]);
+    setShowSearchResults(false);
+    Keyboard.dismiss();
 
     // Show red marker immediately
     setTempMarker({ coordinate, address: 'Loading address...' });
@@ -91,6 +187,44 @@ export default function MapViewScreen() {
       console.error('Error getting address:', error);
       setTempMarker({ coordinate, address: 'Unknown location' });
       setPrefilledLocation({ coordinates: coordinate, name: 'Unknown location' });
+    }
+  };
+
+  // Track if we're programmatically moving the map
+  const [isProgrammaticMove, setIsProgrammaticMove] = useState(false);
+
+  const handleRegionChangeComplete = () => {
+    // Only clear search marker if user manually panned/zoomed (not programmatic)
+    if (searchMarker && !isProgrammaticMove) {
+      console.log('User moved map, clearing search marker');
+      setSearchMarker(null);
+    }
+    setIsProgrammaticMove(false);
+  };
+
+  const handleSearchMarkerPress = () => {
+    if (!searchMarker) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Set up to create a reminder at this location
+    setPrefilledLocation({
+      coordinates: searchMarker.coordinate,
+      name: searchMarker.address,
+    });
+    setTempMarker({
+      coordinate: searchMarker.coordinate,
+      address: searchMarker.address,
+    });
+    setShowLocationModal(true);
+  };
+
+  const handleMapTap = () => {
+    // Clear search results when tapping on map (not long press)
+    if (showSearchResults) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      Keyboard.dismiss();
     }
   };
 
@@ -138,10 +272,43 @@ export default function MapViewScreen() {
     // Don't clear temp marker in case user wants to try again
   };
 
-  const handleMarkerPress = (reminder: any) => {
+  const handleMarkerPress = (cluster: any[]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedReminder(reminder);
-    setShowReminderModal(true);
+
+    // If cluster has only one reminder, show it directly
+    if (cluster.length === 1) {
+      const reminder = cluster[0];
+
+      // Zoom to the reminder location
+      if (mapRef.current && reminder.location) {
+        setIsProgrammaticMove(true);
+        mapRef.current.animateToRegion({
+          latitude: reminder.location.latitude,
+          longitude: reminder.location.longitude,
+          latitudeDelta: 0.2,
+          longitudeDelta: 0.2,
+        }, 500);
+      }
+
+      setSelectedReminder(reminder);
+      setShowReminderModal(true);
+    } else {
+      // If multiple reminders, show the first one (could be enhanced to show a list)
+      const reminder = cluster[0];
+
+      if (mapRef.current && reminder.location) {
+        setIsProgrammaticMove(true);
+        mapRef.current.animateToRegion({
+          latitude: reminder.location.latitude,
+          longitude: reminder.location.longitude,
+          latitudeDelta: 0.2,
+          longitudeDelta: 0.2,
+        }, 500);
+      }
+
+      setSelectedReminder(reminder);
+      setShowReminderModal(true);
+    }
   };
 
   const handleCreateReminderHere = () => {
@@ -204,8 +371,8 @@ export default function MapViewScreen() {
       mapRef.current.animateToRegion({
         latitude: position.latitude,
         longitude: position.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        latitudeDelta: 0.3,
+        longitudeDelta: 0.3,
       }, 500);
     }
   };
@@ -226,6 +393,41 @@ export default function MapViewScreen() {
         animated: true,
       });
     }
+  };
+
+  const handleSearchResultSelect = (result: SearchResult) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const latitude = parseFloat(result.lat);
+    const longitude = parseFloat(result.lon);
+    const address = formatAddress(result.display_name, result.address);
+
+    console.log('Selected search result:', { latitude, longitude, address });
+
+    // Always show search marker
+    console.log('Setting search marker at:', { latitude, longitude });
+    setSearchMarker({
+      coordinate: { latitude, longitude },
+      address,
+    });
+
+    // Set flag to prevent clearing marker on programmatic map move
+    setIsProgrammaticMove(true);
+
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01, // More zoomed in (was 0.05)
+        longitudeDelta: 0.01,
+      }, 500);
+    }
+
+    // Clear search UI
+    setSearchTerm("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+    Keyboard.dismiss();
   };
 
   if (isLoading) {
@@ -254,43 +456,180 @@ export default function MapViewScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <MapView
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={{
           latitude: position.latitude,
           longitude: position.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitudeDelta: 0.3,
+          longitudeDelta: 0.3,
         }}
         showsUserLocation
         showsCompass
         showsScale
+        onPress={handleMapTap}
         onLongPress={handleMapPress}
+        onRegionChangeComplete={handleRegionChangeComplete}
       >
-        {/* Render reminder markers */}
-        {activeReminders.map((reminder) => (
-          <Marker
-            key={reminder.id}
-            coordinate={{
-              latitude: reminder.location.latitude,
-              longitude: reminder.location.longitude,
-            }}
-            pinColor={colors.coral}
-            onPress={() => handleMarkerPress(reminder)}
-          />
-        ))}
+        {/* Render reminder markers with counts */}
+        {reminderClusters.map((cluster, index) => {
+          const firstReminder = cluster[0];
+          const count = cluster.length;
 
-        {/* Temporary marker for tap location */}
+          return (
+            <Marker
+              key={`cluster-${index}`}
+              coordinate={{
+                latitude: firstReminder.location.latitude,
+                longitude: firstReminder.location.longitude,
+              }}
+              onPress={() => handleMarkerPress(cluster)}
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              <View style={styles.markerContainer}>
+                <View style={styles.pinBackground}>
+                  <MaterialCommunityIcons name="map-marker" size={32} color="#FF8C42" />
+                </View>
+                {count > 1 && (
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countText}>{count}</Text>
+                  </View>
+                )}
+              </View>
+            </Marker>
+          );
+        })}
+
+        {/* Search result marker (green) */}
+        {searchMarker && (
+          <Marker
+            coordinate={searchMarker.coordinate}
+            onPress={handleSearchMarkerPress}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={styles.markerContainer}>
+              <View style={styles.pinBackground}>
+                <MaterialCommunityIcons name="map-marker" size={32} color="#10B981" />
+              </View>
+            </View>
+          </Marker>
+        )}
+
+        {/* Temporary marker for tap location (red) */}
         {tempMarker && (
-          <Marker coordinate={tempMarker.coordinate}>
-            <View style={styles.tempMarkerContainer}>
-              <View style={styles.tempMarker} />
+          <Marker coordinate={tempMarker.coordinate} anchor={{ x: 0.5, y: 1 }}>
+            <View style={styles.markerContainer}>
+              <View style={styles.pinBackground}>
+                <MaterialCommunityIcons name="map-marker" size={32} color="#FF6B6B" />
+              </View>
             </View>
           </Marker>
         )}
       </MapView>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={[styles.searchBar, { backgroundColor: colors.backgroundRoot }]}>
+          {isGlobalSearch ? (
+            <Feather name="globe" size={20} color={colors.primary} />
+          ) : (
+            <Feather name="search" size={20} color={colors.tabIconDefault} />
+          )}
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={isGlobalSearch ? "Searching globally..." : "Search for a place or address"}
+            placeholderTextColor={colors.tabIconDefault}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            autoCapitalize="none"
+            autoCorrect={true}
+            returnKeyType="search"
+            keyboardType="default"
+            textContentType="fullStreetAddress"
+          />
+          {isSearching && <ActivityIndicator size="small" color={colors.primary} />}
+          {searchTerm.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchTerm("");
+                setSearchResults([]);
+                setShowSearchResults(false);
+                setIsGlobalSearch(false);
+                Keyboard.dismiss();
+              }}
+            >
+              <Feather name="x" size={20} color={colors.tabIconDefault} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Search Results */}
+        {showSearchResults && searchTerm.trim() !== "" && (
+          <View style={[styles.searchResultsContainer, { backgroundColor: colors.backgroundRoot }]}>
+            {/* Global Search Toggle Button - Always visible when searching */}
+            {!isGlobalSearch && (
+              <TouchableOpacity
+                style={[styles.globalSearchButton, { backgroundColor: colors.backgroundDefault, borderColor: colors.border }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setIsGlobalSearch(true);
+                }}
+              >
+                <Feather name="globe" size={16} color={colors.primary} />
+                <Text style={[styles.globalSearchButtonText, { color: colors.text }]}>
+                  Search Globally
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Results List */}
+            {searchResults.length > 0 ? (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.place_id.toString()}
+                renderItem={({ item }) => {
+                  const distance = position
+                    ? calculateDistance(
+                        position.latitude,
+                        position.longitude,
+                        parseFloat(item.lat),
+                        parseFloat(item.lon)
+                      )
+                    : null;
+
+                  return (
+                    <TouchableOpacity
+                      style={[styles.searchResultItem, { borderBottomColor: colors.border }]}
+                      onPress={() => handleSearchResultSelect(item)}
+                    >
+                      <Feather name="map-pin" size={18} color={colors.tabIconDefault} />
+                      <View style={styles.searchResultTextContainer}>
+                        <Text style={[styles.searchResultText, { color: colors.text }]} numberOfLines={2}>
+                          {formatAddress(item.display_name, item.address)}
+                        </Text>
+                        {distance !== null && (
+                          <Text style={[styles.searchResultDistance, { color: colors.tabIconDefault }]}>
+                            {formatDistance(distance, settings.distanceUnit)} away
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+                keyboardShouldPersistTaps="handled"
+                style={styles.searchResultsList}
+              />
+            ) : !isSearching ? (
+              <Text style={[styles.emptySearchText, { color: colors.tabIconDefault }]}>
+                {isGlobalSearch ? 'No locations found worldwide' : 'No locations found nearby'}
+              </Text>
+            ) : null}
+          </View>
+        )}
+      </View>
 
       {/* Map control buttons */}
       <View style={styles.mapControls}>
@@ -419,6 +758,7 @@ export default function MapViewScreen() {
         prefilledLocation={prefilledLocation}
       />
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -466,23 +806,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     textAlign: "center",
     paddingHorizontal: Spacing["2xl"],
-  },
-  tempMarkerContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tempMarker: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#FF6B6B", // colors.coral
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
   },
   bottomSheetOverlay: {
     flex: 1,
@@ -571,5 +894,118 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
+  },
+  searchContainer: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  searchResultsContainer: {
+    marginTop: 8,
+    borderRadius: BorderRadius.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    maxHeight: 300,
+  },
+  searchResultsList: {
+    maxHeight: 300,
+  },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  searchResultTextContainer: {
+    flex: 1,
+  },
+  searchResultText: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  searchResultDistance: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  emptySearchText: {
+    textAlign: "center",
+    padding: 16,
+    fontSize: 14,
+  },
+  globalSearchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: BorderRadius.md,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  globalSearchButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  markerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  pinBackground: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  countBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FF8C42",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  countText: {
+    color: "#FF8C42",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

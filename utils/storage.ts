@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Reminder, TriggeredReminder, UserSettings } from "../types";
+import { Reminder, TriggeredReminder, UserSettings, LocationPreset } from "../types";
 
 const REMINDERS_KEY = "reminders";
 const TRIGGERED_KEY = "triggeredReminders";
 const SETTINGS_KEY = "settings";
+const LOCATION_PRESETS_KEY = "locationPresets";
 
 export async function saveReminders(reminders: Reminder[]): Promise<void> {
   await AsyncStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders));
@@ -37,4 +38,13 @@ export async function loadSettings(): Promise<UserSettings> {
         dwellTime: 0,
         notificationsEnabled: true,
       };
+}
+
+export async function saveLocationPresets(presets: LocationPreset[]): Promise<void> {
+  await AsyncStorage.setItem(LOCATION_PRESETS_KEY, JSON.stringify(presets));
+}
+
+export async function loadLocationPresets(): Promise<LocationPreset[]> {
+  const stored = await AsyncStorage.getItem(LOCATION_PRESETS_KEY);
+  return stored ? JSON.parse(stored) : [];
 }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "../components/ThemedText";
 import { ReminderCard } from "../components/ReminderCard";
 import { EmptyState } from "../components/EmptyState";
@@ -70,6 +71,13 @@ export default function ListViewScreen() {
     setOptionsModalOpen(true);
   };
 
+  const handleReminderLongPress = (id: string) => {
+    // Enter selection mode and select this item
+    setSelectionMode(true);
+    setSelectedIds([id]);
+  };
+
+
   const handleEdit = () => {
     if (!selectedReminder) return;
 
@@ -136,7 +144,8 @@ export default function ListViewScreen() {
       const count = await batchArchive(selectedIds);
       setSelectedIds([]);
       setSelectionMode(false);
-      Alert.alert("Success", `${count} reminder${count === 1 ? '' : 's'} archived`);
+      setConfettiColor("coral");
+      setShowConfetti(true);
     } catch (error) {
       Alert.alert("Error", "Failed to archive reminders");
     }
@@ -172,17 +181,16 @@ export default function ListViewScreen() {
   return (
     <>
     <ScreenScrollView style={{ backgroundColor: colors.background }}>
-      {/* Header with View Mode Toggle and Selection Button */}
-      <View style={styles.headerContainer}>
-        <View style={styles.viewModeContainer}>
+      {/* Mode Toggle Slider at Top */}
+      <View style={styles.topContainer}>
+        <View style={styles.modeToggleSlider}>
           <TouchableOpacity
             style={[
-              styles.viewModeButton,
-              {
-                backgroundColor: viewMode === "active" ? colors.primary : colors.surfaceSecondary,
-              },
+              styles.sliderButton,
+              viewMode === "active" && { backgroundColor: colors.primary },
             ]}
             onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setViewMode("active");
               setSelectionMode(false);
               setSelectedIds([]);
@@ -190,10 +198,8 @@ export default function ListViewScreen() {
           >
             <ThemedText
               style={[
-                styles.viewModeText,
-                {
-                  color: viewMode === "active" ? colors.buttonText : colors.textPrimary,
-                },
+                styles.sliderButtonText,
+                { color: viewMode === "active" ? colors.buttonText : colors.text },
               ]}
             >
               Active
@@ -201,12 +207,11 @@ export default function ListViewScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[
-              styles.viewModeButton,
-              {
-                backgroundColor: viewMode === "archived" ? colors.primary : colors.surfaceSecondary,
-              },
+              styles.sliderButton,
+              viewMode === "archived" && { backgroundColor: colors.primary },
             ]}
             onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setViewMode("archived");
               setSelectionMode(false);
               setSelectedIds([]);
@@ -214,33 +219,19 @@ export default function ListViewScreen() {
           >
             <ThemedText
               style={[
-                styles.viewModeText,
-                {
-                  color: viewMode === "archived" ? colors.buttonText : colors.textPrimary,
-                },
+                styles.sliderButtonText,
+                { color: viewMode === "archived" ? colors.buttonText : colors.text },
               ]}
             >
               Archived
             </ThemedText>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          onPress={() => {
-            setSelectionMode(!selectionMode);
-            setSelectedIds([]);
-          }}
-          style={styles.selectButton}
-        >
-          <ThemedText style={{ color: colors.primary, fontSize: 14, fontWeight: "600" }}>
-            {selectionMode ? "Cancel" : "Select"}
-          </ThemedText>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: colors.surfaceSecondary }]}>
+        <View style={styles.searchBar}>
           <Feather name="search" size={20} color={colors.tabIconDefault} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
@@ -252,25 +243,37 @@ export default function ListViewScreen() {
         </View>
       </View>
 
-      {/* Select All in Selection Mode */}
-      {selectionMode && filteredReminders.length > 0 && (
-        <View style={styles.selectAllContainer}>
-          <TouchableOpacity
-            style={styles.selectAllButton}
-            onPress={toggleSelectAll}
-          >
-            <Feather
-              name={selectedIds.length === filteredReminders.length ? "check-square" : "square"}
-              size={20}
-              color={colors.primary}
-            />
-            <ThemedText style={styles.selectAllText}>
-              {selectedIds.length === filteredReminders.length ? "Deselect All" : "Select All"}
-            </ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={{ color: colors.tabIconDefault, fontSize: 14 }}>
+      {/* Selection Mode Header */}
+      {selectionMode && (
+        <View style={[styles.selectionHeader, { borderBottomColor: colors.border }]}>
+          {filteredReminders.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                toggleSelectAll();
+              }}
+              style={styles.selectAllButton}
+            >
+              <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: "600" }}>
+                {selectedIds.length === filteredReminders.length ? "Deselect All" : "Select All"}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+          <ThemedText style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>
             {selectedIds.length} selected
           </ThemedText>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectionMode(false);
+              setSelectedIds([]);
+            }}
+            style={styles.cancelButton}
+          >
+            <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: "600" }}>
+              Cancel
+            </ThemedText>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -304,6 +307,7 @@ export default function ListViewScreen() {
                   trigger={reminder.trigger}
                   recurrence={reminder.recurrence}
                   onPress={() => handleReminderPress(reminder.id)}
+                  onLongPress={() => handleReminderLongPress(reminder.id)}
                 />
               </View>
             </View>
@@ -391,33 +395,37 @@ export default function ListViewScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  topContainer: {
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    marginTop: -30, // Move both sections up by 30px
   },
-  viewModeContainer: {
+  modeToggleSlider: {
     flexDirection: "row",
-    gap: 8,
-  },
-  viewModeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    padding: 4,
     borderRadius: BorderRadius.md,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  viewModeText: {
+  sliderButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+  },
+  sliderButtonText: {
     fontSize: 14,
     fontWeight: "600",
   },
-  selectButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
   searchContainer: {
     paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xs,
     paddingBottom: Spacing.md,
   },
   searchBar: {
@@ -426,44 +434,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     height: Spacing.inputHeight,
     borderRadius: BorderRadius.xs,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
     marginLeft: Spacing.md,
     fontSize: 16,
   },
-  selectAllContainer: {
+  selectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
   selectAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    paddingVertical: 4,
   },
-  selectAllText: {
-    fontSize: 14,
-    fontWeight: "600",
+  cancelButton: {
+    paddingVertical: 4,
   },
   content: {
     paddingHorizontal: Spacing.xl,
-    paddingBottom: 100, // Extra padding for batch actions button
+    paddingBottom: 100, // Extra padding for batch actions buttons
   },
   reminderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginBottom: Spacing.md,
+    marginBottom: 0,
   },
   checkbox: {
     padding: 4,
   },
   batchActionsContainer: {
     position: "absolute",
-    bottom: 0,
+    bottom: 80, // Position above bottom navigation
     left: 0,
     right: 0,
     flexDirection: "row",

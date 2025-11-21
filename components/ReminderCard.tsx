@@ -13,6 +13,7 @@ interface ReminderCardProps {
   trigger: TriggerType;
   recurrence: RecurrenceType;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
 export function ReminderCard({
@@ -21,9 +22,13 @@ export function ReminderCard({
   trigger,
   recurrence,
   onPress,
+  onLongPress,
 }: ReminderCardProps) {
   const { colors } = useTheme();
-  const triggerColor = trigger === "arriving" ? colors.primary : colors.orange;
+  const triggerColor =
+    trigger === "arriving" ? colors.primary :
+    trigger === "leaving" ? colors.orange :
+    colors.textPrimary;
 
   const getRecurrenceText = () => {
     if (recurrence.type === "once") return "Once";
@@ -46,9 +51,15 @@ export function ReminderCard({
     onPress();
   };
 
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress?.();
+  };
+
   return (
     <Pressable
       onPress={handlePress}
+      onLongPress={onLongPress ? handleLongPress : undefined}
       style={({ pressed }) => [
         styles.card,
         {
@@ -66,7 +77,7 @@ export function ReminderCard({
           ]}
         >
           <ThemedText style={[styles.badgeText, { color: triggerColor }]}>
-            {trigger === "arriving" ? "Arriving" : "Leaving"}
+            {trigger === "arriving" ? "Arriving" : trigger === "leaving" ? "Leaving" : "Never"}
           </ThemedText>
         </View>
       </View>

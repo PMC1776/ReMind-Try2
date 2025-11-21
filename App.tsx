@@ -10,6 +10,7 @@ import RootNavigator from "@/navigation/RootNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/useAuth";
 import { RemindersProvider } from "@/hooks/useReminders";
+import { LocationPresetsProvider } from "@/hooks/useLocationPresets";
 
 export default function App() {
   return (
@@ -19,10 +20,12 @@ export default function App() {
           <KeyboardProvider>
             <AuthProvider>
               <RemindersProvider>
-                <NavigationContainer>
-                  <RootNavigator />
-                </NavigationContainer>
-                <StatusBar style="auto" />
+                <LocationPresetsProvider>
+                  <NavigationContainer>
+                    <RootNavigator />
+                  </NavigationContainer>
+                  <StatusBar style="auto" />
+                </LocationPresetsProvider>
               </RemindersProvider>
             </AuthProvider>
           </KeyboardProvider>

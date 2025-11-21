@@ -184,3 +184,101 @@ export function restoreFromRecoveryKey(recoveryKey: string): EncryptionKeys {
     throw new Error(`Failed to restore from recovery key: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+// ========== Secretbox (Symmetric) Encryption for Location Presets ==========
+
+export async function generateSecretKey(): Promise<string> {
+  const key = Crypto.getRandomBytes(nacl.secretbox.keyLength); // 32 bytes
+  return encodeBase64(Uint8Array.from(key));
+}
+
+export async function saveSecretKey(key: string): Promise<void> {
+  await secureStorage.setItem("secretKey", key);
+}
+
+export async function loadSecretKey(): Promise<string | null> {
+  return await secureStorage.getItem("secretKey");
+}
+
+export async function ensureSecretKey(): Promise<string> {
+  let key = await loadSecretKey();
+  if (!key) {
+    console.log("No secret key found, generating new one...");
+    key = await generateSecretKey();
+    await saveSecretKey(key);
+  }
+  return key;
+}
+
+export function encryptWithSecretbox(text: string, secretKey: string): string {
+  try {
+    const encoder = new TextEncoder();
+    const message = encoder.encode(text);
+
+    const nonceBytes = Crypto.getRandomBytes(nacl.secretbox.nonceLength); // 24 bytes
+    const nonce = Uint8Array.from(nonceBytes);
+
+    const secretKeyBytes = decodeBase64(secretKey);
+    const secretKeyUint8 = Uint8Array.from(secretKeyBytes as any);
+
+    const encrypted = nacl.secretbox(message, nonce, secretKeyUint8);
+
+    if (!encrypted) {
+      throw new Error("Encryption failed");
+    }
+
+    // Return as JSON string with encrypted and nonce
+    return JSON.stringify({
+      encrypted: encodeBase64(encrypted),
+      nonce: encodeBase64(nonce),
+    });
+  } catch (error) {
+    console.error("Secretbox encryption error:", error);
+    throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export function decryptWithSecretbox(encryptedJson: string, secretKey: string): string {
+  try {
+    // Parse the JSON
+    const { encrypted, nonce } = JSON.parse(encryptedJson);
+
+    // Decode from base64
+    const encryptedBytes = decodeBase64(encrypted);
+    const nonceBytes = decodeBase64(nonce);
+    const secretKeyBytes = decodeBase64(secretKey);
+
+    const encryptedUint8 = Uint8Array.from(encryptedBytes as any);
+    const nonceUint8 = Uint8Array.from(nonceBytes as any);
+    const secretKeyUint8 = Uint8Array.from(secretKeyBytes as any);
+
+    // Decrypt
+    const decrypted = nacl.secretbox.open(encryptedUint8, nonceUint8, secretKeyUint8);
+
+    if (!decrypted) {
+      throw new Error("Decryption failed - message could not be authenticated");
+    }
+
+    // Decode UTF-8
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(decrypted);
+  } catch (error) {
+    console.error("Secretbox decryption error:", error);
+    throw error;
+  }
+}
+
+// Helper function to auto-assign icon based on preset name
+export function getPresetIcon(name: string): string {
+  const nameLower = name.toLowerCase();
+  if (nameLower.includes('home')) return '🏠';
+  if (nameLower.includes('work') || nameLower.includes('office')) return '💼';
+  if (nameLower.includes('school') || nameLower.includes('university') || nameLower.includes('college')) return '🎓';
+  if (nameLower.includes('gym') || nameLower.includes('fitness')) return '💪';
+  if (nameLower.includes('store') || nameLower.includes('shop') || nameLower.includes('market')) return '🛒';
+  if (nameLower.includes('restaurant') || nameLower.includes('cafe') || nameLower.includes('coffee')) return '🍽️';
+  if (nameLower.includes('park')) return '🌳';
+  if (nameLower.includes('hospital') || nameLower.includes('doctor') || nameLower.includes('clinic')) return '🏥';
+  if (nameLower.includes('church') || nameLower.includes('temple') || nameLower.includes('mosque')) return '⛪';
+  return '📍'; // Default
+}

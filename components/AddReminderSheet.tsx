@@ -100,7 +100,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
   const { colors } = useTheme();
   const { settings } = useReminders();
   const [task, setTask] = useState("");
-  const [trigger, setTrigger] = useState<"arriving" | "leaving">("arriving");
+  const [trigger, setTrigger] = useState<"arriving" | "leaving" | "never">("arriving");
   const [recurrence, setRecurrence] = useState<RecurrenceType>({ type: "once" });
   const [assignees, setAssignees] = useState<string[]>(["Me"]);
   const [locationType, setLocationType] = useState<LocationType>("current");
@@ -249,6 +249,8 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
           {/* Form */}
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             <View style={styles.formContainer}>
+              {/* Top Divider */}
+              <View style={[styles.topDivider, { backgroundColor: colors.border }]}/>
               {/* Who? */}
               <FormRow label="Who?">
                 <View style={styles.assigneesContainer}>
@@ -325,6 +327,12 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
                   >
                     Leaving
                   </SegmentedButton>
+                  <SegmentedButton
+                    isActive={trigger === "never"}
+                    onPress={() => setTrigger("never")}
+                  >
+                    Never
+                  </SegmentedButton>
                 </View>
               </FormRow>
 
@@ -357,7 +365,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
               </FormRow>
 
               {/* How Often? */}
-              <FormRow label="How Often?" showBorder={false}>
+              <FormRow label="Repeat?" showBorder={true}>
                 <View style={styles.buttonGroup}>
                   <SegmentedButton
                     isActive={recurrence.type === "once"}
@@ -429,7 +437,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 512,
-    height: "85%",
+    maxHeight: "90%",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: "#000",
@@ -442,7 +450,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: Spacing.xl,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     alignItems: "center",
   },
   headerTitle: {
@@ -451,23 +459,26 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flexGrow: 1,
-    flexShrink: 1,
   },
   formContainer: {
-    paddingTop: Spacing.md,
+    paddingTop: 0,
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xl,
+    paddingBottom: Spacing.lg,
+  },
+  topDivider: {
+    height: 1,
+    width: "100%",
+    marginBottom: 0,
   },
   formRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 16,
-    paddingVertical: 12,
+    paddingVertical: 20,
   },
   labelContainer: {
     width: 64,
     flexShrink: 0,
-    paddingTop: 8,
   },
   label: {
     fontSize: 14,
@@ -505,18 +516,19 @@ const styles = StyleSheet.create({
   textInput: {
     width: "100%",
     minHeight: 80,
-    padding: 8,
+    paddingVertical: 12,
     fontSize: 16,
-    textAlignVertical: "top",
+    textAlignVertical: "center",
   },
   buttonGroup: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
-  },
+      },
   segmentedButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: BorderRadius.md,
   },
   segmentedButtonText: {
@@ -531,15 +543,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingTop: 8,
   },
   selectedLocationText: {
     fontSize: 14,
     flex: 1,
   },
   footer: {
-    padding: Spacing.xl,
-    borderTopWidth: 1,
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 30,
+    flexShrink: 0,
   },
   submitButton: {
     width: "100%",

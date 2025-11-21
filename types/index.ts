@@ -1,4 +1,4 @@
-export type TriggerType = "arriving" | "leaving";
+export type TriggerType = "arriving" | "leaving" | "never";
 export type RecurrenceType =
   | { type: "once" }
   | { type: "eachTime" }
@@ -42,4 +42,38 @@ export interface UserSettings {
   notificationsEnabled: boolean;
   distanceUnit: "miles" | "km";
   timeFormat: "12h" | "24h";
+}
+
+export interface LocationPreset {
+  id: string;
+  userId: string;
+  name: string; // Decrypted on client
+  coordinates: Coordinates;
+  address: string | null; // Decrypted on client
+  icon: string | null;
+  createdAt: number; // Unix timestamp in seconds
+}
+
+export interface EncryptedLocationPreset {
+  id: string;
+  userId: string;
+  name: string; // Encrypted JSON string
+  coordinates: Coordinates;
+  address: string | null; // Encrypted JSON string or null
+  icon: string | null;
+  createdAt: number;
+}
+
+export interface CreateLocationPresetInput {
+  name: string;
+  coordinates: Coordinates;
+  address?: string | null;
+  icon?: string | null;
+}
+
+export interface UpdateLocationPresetInput {
+  name?: string;
+  coordinates?: Coordinates;
+  address?: string | null;
+  icon?: string | null;
 }
