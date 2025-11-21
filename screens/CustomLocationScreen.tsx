@@ -281,7 +281,7 @@ export default function CustomLocationScreen({
                 value={searchTerm}
                 onChangeText={setSearchTerm}
                 autoCapitalize="none"
-                autoCorrect={false}
+                autoCorrect={true}
                 returnKeyType="search"
               />
               {isLoading && <ActivityIndicator size="small" color={colors.primary} />}

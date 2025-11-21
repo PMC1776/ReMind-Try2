@@ -13,6 +13,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { useReminders } from "@/hooks/useReminders";
+import { useLocationPresets } from "@/hooks/useLocationPresets";
 import { Button } from "@/components/Button";
 import CustomLocationScreen from "@/screens/CustomLocationScreen";
 import { CustomRecurrenceSheet } from "@/components/CustomRecurrenceSheet";
@@ -34,7 +35,7 @@ type RecurrenceType =
   | { type: "eachTime" }
   | { type: "weekly"; days: boolean[]; timeStart?: string; timeEnd?: string; endDate?: string }
   | { type: "specific_dates"; dates: string[]; timeStart?: string; timeEnd?: string; endDate?: string };
-type LocationType = "current" | "custom";
+type LocationType = "current" | "custom" | "saved";
 
 // FormRow component for consistent layout
 const FormRow = ({
@@ -59,7 +60,7 @@ const FormRow = ({
       ]}
     >
       <View style={styles.labelContainer}>
-        <Text style={[styles.label, { color: colors.tabIconDefault }]}>{label}</Text>
+        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
       </View>
       <View style={styles.contentContainer}>{children}</View>
     </View>
@@ -71,10 +72,12 @@ const SegmentedButton = ({
   onPress,
   isActive,
   children,
+  style,
 }: {
   onPress: () => void;
   isActive: boolean;
   children: string;
+  style?: any;
 }) => {
   const { colors } = useTheme();
 
@@ -89,9 +92,17 @@ const SegmentedButton = ({
         {
           backgroundColor: isActive ? colors.primary : colors.surfaceSecondary,
         },
+        style,
       ]}
     >
-      <Text style={[styles.segmentedButtonText, { color: isActive ? colors.buttonText : colors.textPrimary }]}>{children}</Text>
+      <Text
+        style={[styles.segmentedButtonText, { color: isActive ? colors.buttonText : colors.textPrimary }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {children}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -99,6 +110,7 @@ const SegmentedButton = ({
 export default function AddReminderSheet({ isOpen, onClose, onSave, existingReminder, prefilledLocation }: AddReminderSheetProps) {
   const { colors } = useTheme();
   const { settings } = useReminders();
+  const { presets } = useLocationPresets();
   const [task, setTask] = useState("");
   const [trigger, setTrigger] = useState<"arriving" | "leaving" | "never">("arriving");
   const [recurrence, setRecurrence] = useState<RecurrenceType>({ type: "once" });
@@ -107,6 +119,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
   const [customLocation, setCustomLocation] = useState<{ name: string; coordinates: Coordinates } | null>(null);
   const [showCustomLocationModal, setShowCustomLocationModal] = useState(false);
+  const [showSavedLocationsModal, setShowSavedLocationsModal] = useState(false);
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
 
   // Mock users for the "Who?" section
@@ -176,6 +189,12 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
     setShowCustomLocationModal(false);
   };
 
+  const handleSavedLocationSelect = (location: { name: string; coordinates: Coordinates }) => {
+    setCustomLocation(location);
+    setLocationType("saved");
+    setShowSavedLocationsModal(false);
+  };
+
   const handleSave = async () => {
     if (!task.trim()) {
       return;
@@ -185,7 +204,7 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
     let finalLocation: Coordinates;
     let locationName: string;
 
-    if (locationType === "custom" && customLocation) {
+    if ((locationType === "custom" || locationType === "saved") && customLocation) {
       finalLocation = customLocation.coordinates;
       locationName = customLocation.name;
     } else {
@@ -251,6 +270,52 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
             <View style={styles.formContainer}>
               {/* Top Divider */}
               <View style={[styles.topDivider, { backgroundColor: colors.border }]}/>
+              {/* What? */}
+              <FormRow label="What?">
+                <TextInput
+                  value={task}
+                  onChangeText={setTask}
+                  placeholder="e.g., 'Try the caramel latte' or 'Pick up groceries'"
+                  placeholderTextColor={colors.tabIconDefault}
+                  multiline
+                  numberOfLines={3}
+                  style={[
+                    styles.textInput,
+                    {
+                      color: colors.text,
+                      backgroundColor: "transparent",
+                    },
+                  ]}
+                />
+              </FormRow>
+
+              {/* When? */}
+              <FormRow label="When?">
+                <View style={styles.buttonGroup}>
+                  <SegmentedButton
+                    isActive={trigger === "arriving"}
+                    onPress={() => setTrigger("arriving")}
+                    style={{ flex: 1 }}
+                  >
+                    Arriving
+                  </SegmentedButton>
+                  <SegmentedButton
+                    isActive={trigger === "leaving"}
+                    onPress={() => setTrigger("leaving")}
+                    style={{ flex: 1 }}
+                  >
+                    Leaving
+                  </SegmentedButton>
+                  <SegmentedButton
+                    isActive={trigger === "never"}
+                    onPress={() => setTrigger("never")}
+                    style={{ flex: 1 }}
+                  >
+                    Never
+                  </SegmentedButton>
+                </View>
+              </FormRow>
+
               {/* Who? */}
               <FormRow label="Who?">
                 <View style={styles.assigneesContainer}>
@@ -293,49 +358,6 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
                 </View>
               </FormRow>
 
-              {/* What? */}
-              <FormRow label="What?">
-                <TextInput
-                  value={task}
-                  onChangeText={setTask}
-                  placeholder="e.g., 'Try the caramel latte' or 'Pick up groceries'"
-                  placeholderTextColor={colors.tabIconDefault}
-                  multiline
-                  numberOfLines={3}
-                  style={[
-                    styles.textInput,
-                    {
-                      color: colors.text,
-                      backgroundColor: "transparent",
-                    },
-                  ]}
-                />
-              </FormRow>
-
-              {/* When? */}
-              <FormRow label="When?">
-                <View style={styles.buttonGroup}>
-                  <SegmentedButton
-                    isActive={trigger === "arriving"}
-                    onPress={() => setTrigger("arriving")}
-                  >
-                    Arriving
-                  </SegmentedButton>
-                  <SegmentedButton
-                    isActive={trigger === "leaving"}
-                    onPress={() => setTrigger("leaving")}
-                  >
-                    Leaving
-                  </SegmentedButton>
-                  <SegmentedButton
-                    isActive={trigger === "never"}
-                    onPress={() => setTrigger("never")}
-                  >
-                    Never
-                  </SegmentedButton>
-                </View>
-              </FormRow>
-
               {/* Where? */}
               <FormRow label="Where?">
                 <View style={styles.whereContainer}>
@@ -343,17 +365,26 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
                     <SegmentedButton
                       isActive={locationType === "current"}
                       onPress={() => setLocationType("current")}
+                      style={{ flex: 1 }}
                     >
-                      Current Location
+                      Current
+                    </SegmentedButton>
+                    <SegmentedButton
+                      isActive={locationType === "saved"}
+                      onPress={() => setShowSavedLocationsModal(true)}
+                      style={{ flex: 1 }}
+                    >
+                      Saved
                     </SegmentedButton>
                     <SegmentedButton
                       isActive={locationType === "custom"}
                       onPress={() => setShowCustomLocationModal(true)}
+                      style={{ flex: 1 }}
                     >
                       Custom
                     </SegmentedButton>
                   </View>
-                  {locationType === "custom" && customLocation && (
+                  {(locationType === "custom" || locationType === "saved") && customLocation && (
                     <View style={styles.selectedLocationContainer}>
                       <Feather name="map-pin" size={16} color={colors.primary} />
                       <Text style={[styles.selectedLocationText, { color: colors.text }]} numberOfLines={2}>
@@ -370,18 +401,21 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
                   <SegmentedButton
                     isActive={recurrence.type === "once"}
                     onPress={() => setRecurrence({ type: "once" })}
+                    style={{ flex: 1 }}
                   >
                     Once
                   </SegmentedButton>
                   <SegmentedButton
                     isActive={recurrence.type === "eachTime"}
                     onPress={() => setRecurrence({ type: "eachTime" })}
+                    style={{ flex: 1 }}
                   >
                     Always
                   </SegmentedButton>
                   <SegmentedButton
                     isActive={recurrence.type === "weekly" || recurrence.type === "specific_dates"}
                     onPress={() => setShowCustomRecurrenceModal(true)}
+                    style={{ flex: 1 }}
                   >
                     Custom
                   </SegmentedButton>
@@ -408,6 +442,60 @@ export default function AddReminderSheet({ isOpen, onClose, onSave, existingRemi
         onClose={() => setShowCustomLocationModal(false)}
         onSelect={handleCustomLocationSelect}
       />
+
+      {/* Saved Locations Modal */}
+      <Modal visible={showSavedLocationsModal} transparent animationType="slide" onRequestClose={() => setShowSavedLocationsModal(false)}>
+        <View style={styles.modalContainer}>
+          <Pressable style={styles.overlay} onPress={() => setShowSavedLocationsModal(false)} />
+          <View style={[styles.savedLocationsSheet, { backgroundColor: colors.backgroundRoot }]}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Saved Locations</Text>
+            </View>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              {presets.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Feather name="map-pin" size={48} color={colors.tabIconDefault} />
+                  <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                    No saved locations yet.
+                  </Text>
+                  <Text style={[styles.emptyStateSubtext, { color: colors.tabIconDefault }]}>
+                    Save locations from the map to quickly reuse them.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.presetsContainer}>
+                  {presets.map((preset) => (
+                    <TouchableOpacity
+                      key={preset.id}
+                      style={[styles.presetItem, { borderBottomColor: colors.border }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        handleSavedLocationSelect({
+                          name: preset.name,
+                          coordinates: preset.coordinates,
+                        });
+                      }}
+                    >
+                      <View style={styles.presetIconContainer}>
+                        <Text style={styles.presetIcon}>{preset.icon || "📍"}</Text>
+                      </View>
+                      <View style={styles.presetInfo}>
+                        <Text style={[styles.presetName, { color: colors.text }]}>{preset.name}</Text>
+                        {preset.address && (
+                          <Text style={[styles.presetAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {preset.address}
+                          </Text>
+                        )}
+                      </View>
+                      <Feather name="chevron-right" size={20} color={colors.tabIconDefault} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Custom Recurrence Modal */}
       <CustomRecurrenceSheet
@@ -481,7 +569,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
   },
   contentContainer: {
@@ -530,11 +618,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
   },
   segmentedButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
   },
   whereContainer: {
     gap: 12,
@@ -556,5 +647,68 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     width: "100%",
+  },
+  savedLocationsSheet: {
+    width: "100%",
+    maxWidth: 512,
+    maxHeight: "70%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    display: "flex",
+    flexDirection: "column",
+  },
+  emptyStateContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  presetsContainer: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.lg,
+  },
+  presetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  presetIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  presetIcon: {
+    fontSize: 24,
+  },
+  presetInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  presetName: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  presetAddress: {
+    fontSize: 14,
   },
 });
